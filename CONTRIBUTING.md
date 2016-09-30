@@ -13,7 +13,7 @@ Follow these steps to contribute code or documentation to this project:
 
    You need to do this only once, before your first contribution.
 
-2. For large contributions (see below), make sure to first discuss your ideas with us via a GitHub issue or by sending us an email at [contributing@ogmacorp.com](contributing@ogmacorp.com).
+2. For large contributions (see below), make sure to first discuss your ideas with us via a GitHub issue or by sending us an email at contributing@ogmacorp.com
 
 3. Fork this repository.
 
