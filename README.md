@@ -10,7 +10,7 @@
 
 ## Introduction
 
-Welcome to [Ogma Intelligent Systems Corp](https://ogmacorp.com) OgmaNeo library. A C++ library that contains implementation(s) of Online Predicive Hierarchies, as described in the arXiv.org paper: [Feynman Machine: The Universal Dynamical Systems Computer](http://arxiv.org/abs/1609.03971).
+Welcome to [Ogma Intelligent Systems Corp](https://ogmacorp.com) OgmaNeo library. A C++ library that contains implementation(s) of Online Predictive Hierarchies, as described in the arXiv.org paper: [Feynman Machine: The Universal Dynamical Systems Computer](http://arxiv.org/abs/1609.03971).
 
 The current release of this library contains a form of Sparse Predictive Hierarchies. Refer to the arXiv.org paper for further details.
 
