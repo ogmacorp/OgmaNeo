@@ -1,0 +1,28 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+include "Helpers.fbs";
+include "FeatureHierarchy.fbs";
+include "AgentLayer.fbs";
+
+namespace ogmaneo.schemas;
+
+struct AgentLayerDesc {
+    _radius:int;
+    _qAlpha:float;
+    _qGamma:float;
+    _qLambda:float;
+    _epsilon:float;
+}
+
+table AgentSwarm {
+    _h:hierarchy.FeatureHierarchy;
+    _ones:Image2D;
+    _aLayers:[agent.AgentLayer];
+    _aLayerDescs:[AgentLayerDesc];
+}

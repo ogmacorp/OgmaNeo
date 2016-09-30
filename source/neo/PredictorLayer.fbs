@@ -1,0 +1,32 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+include "Helpers.fbs";
+
+namespace ogmaneo.schemas.predictor;
+
+struct VisibleLayerDesc {
+	_size:int2;
+	_radius:int;
+	_alpha:float;
+}
+
+table VisibleLayer {
+	_weights:DoubleBuffer3D;
+	_hiddenToVisible:float2;
+	_visibleToHidden:float2;
+	_reverseRadii:int2;
+}
+
+table Layer {
+	_hiddenSize:int2;
+	_hiddenSummationTemp:DoubleBuffer2D;
+	_hiddenStates:DoubleBuffer2D;
+	_visibleLayerDescs:[VisibleLayerDesc];
+	_visibleLayers:[VisibleLayer];
+}

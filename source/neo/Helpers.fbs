@@ -1,0 +1,97 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+namespace ogmaneo.schemas;
+
+struct int2 {
+	x:int;
+	y:int;
+}
+
+struct int4 {
+	x:int;
+	y:int;
+	z:int;
+	w:int;
+}
+
+struct float2 {
+	x:float;
+	y:float;
+}
+
+struct float4 {
+	x:float;
+	y:float;
+	z:float;
+	w:float;
+}
+
+// Matches cl_channel_order
+enum ChannelOrder:uint {
+	CL_R = 0x10B0, CL_A, CL_RG, CL_RA, CL_RGB, CL_RGBA, CL_BGRA, CL_ARGB,
+	CL_INTENSITY, CL_LUMINANCE, CL_Rx, CL_RGx, CL_RGBx, CL_DEPTH, CL_DEPTH_STENCIL,
+	CL_sRGB, CL_sRGBx, CL_sRGBA, CL_sBGRA, CL_ABGR
+}
+
+// Matches cl_channel_type
+enum ChannelDataType:uint {
+	CL_SNORM_INT8 = 0x10D0, CL_SNORM_INT16, CL_UNORM_INT8, CL_UNORM_INT16,
+	CL_UNORM_SHORT_565, CL_UNORM_SHORT_555, CL_UNORM_INT_101010,
+	CL_SIGNED_INT8, CL_SIGNED_INT16, CL_SIGNED_INT32,
+	CL_UNSIGNED_INT8, CL_UNSIGNED_INT16, CL_UNSIGNED_INT32,
+	CL_HALF_FLOAT, CL_FLOAT, CL_UNORM_INT24
+}
+
+struct ImageFormat {
+    image_channel_order:ChannelOrder;
+    image_channel_data_type:ChannelDataType;
+}
+
+table ByteArray {
+	data:[ubyte];
+}
+
+table ShortArray {
+	data:[ushort];
+}
+
+table FloatArray {
+	data:[float];
+}
+
+union PixelData {
+	ByteArray, ShortArray, FloatArray
+}
+
+table Image2D {
+	format:ImageFormat;
+	width:uint;
+	height:uint;
+	elementSize:uint;
+	pixels:FloatArray;
+}
+
+table Image3D {
+	format:ImageFormat;
+	width:uint;
+	height:uint;
+	depth:uint;
+	elementSize:uint;
+	pixels:FloatArray;
+}
+
+table DoubleBuffer2D {
+	_front:Image2D;
+	_back:Image2D;
+}
+
+table DoubleBuffer3D {
+	_front:Image3D;
+	_back:Image3D;
+}

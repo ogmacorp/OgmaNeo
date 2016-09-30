@@ -1,0 +1,38 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+include "Helpers.fbs";
+
+namespace ogmaneo.schemas.agent;
+
+struct VisibleLayerDesc {
+    _size:int2;
+    _radius:int;
+    _alpha:float;
+}
+
+table VisibleLayer {
+    _weights:DoubleBuffer3D;
+    _hiddenToVisible:float2;
+    _visibleToHidden:float2;
+    _reverseRadii:int2;
+}
+
+table AgentLayer {
+    _numActionTiles:int2;
+    _actionTileSize:int2;
+    _hiddenSize:int2;
+    _qStates:DoubleBuffer2D;
+    _action:DoubleBuffer2D;
+    _actionTaken:DoubleBuffer2D;
+    _tdError:Image2D;
+    _oneHotAction:Image2D;
+    _hiddenSummationTemp:DoubleBuffer2D;
+    _visibleLayers:[VisibleLayer];
+    _visibleLayerDescs:[VisibleLayerDesc];
+}

@@ -1,0 +1,37 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+include "Helpers.fbs";
+include "SparseFeatures.fbs";
+
+namespace ogmaneo.schemas.hierarchy;
+
+struct InputDesc {
+	_size:int2;
+	_radius:int;
+}
+
+table LayerDesc {
+	_size:int2;
+	_inputDescs:[InputDesc];
+	_recurrentRadius:int;
+	_inhibitionRadius:int;
+	_spFeedForwardWeightAlpha:float;
+	_spRecurrentWeightAlpha:float;
+	_spBiasAlpha:float;
+	_spActiveRatio:float;
+}
+
+table Layer {
+	_sp:SparseFeatures;
+}
+
+table FeatureHierarchy {
+	_layers:[Layer];
+	_layerDescs:[LayerDesc];
+}

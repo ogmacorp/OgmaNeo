@@ -1,0 +1,24 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+include "Helpers.fbs";
+include "Predictor.fbs";
+
+namespace ogmaneo.schemas.hierarchy;
+
+table Hierarchy {
+    _ph:predictor.Predictor;
+    _inputWidth:int;
+    _inputHeight:int;
+    _inputImage:Image2D;
+    _pred:[float];
+}
+
+root_type Hierarchy;
+file_identifier "OFHB";
+file_extension "ofh";

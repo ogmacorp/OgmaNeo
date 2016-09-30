@@ -1,0 +1,28 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+include "Helpers.fbs";
+include "AgentSwarm.fbs";
+
+namespace ogmaneo.schemas.agent;
+
+table Agent {
+    _as:AgentSwarm;
+    _inputWidth:int;
+    _inputHeight:int;
+    _actionWidth:int;
+    _actionHeight:int;
+    _actionTileWidth:int;
+    _actionTileHeight:int;
+    _inputImage:Image2D;
+    _action:[float];
+}
+
+root_type Agent;
+file_identifier "OASB";
+file_extension "oas";

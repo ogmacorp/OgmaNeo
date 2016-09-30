@@ -1,0 +1,30 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+include "Helpers.fbs";
+include "FeatureHierarchy.fbs";
+include "PredictorLayer.fbs";
+
+namespace ogmaneo.schemas.predictor;
+
+struct LayerDesc {
+	_radius:int;
+	_alpha:float;
+	_beta:float;
+}
+
+table Predictor {
+	_h:hierarchy.FeatureHierarchy;
+	_inputSize:int2;
+	_pLayers:[Layer];
+	_pLayerDescs:[LayerDesc];
+}
+
+root_type Predictor;
+file_identifier "OPRB";
+file_extension "opr";
