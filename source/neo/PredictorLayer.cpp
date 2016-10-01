@@ -21,7 +21,7 @@ void PredictorLayer::createRandom(ComputeSystem &cs, ComputeProgram &program,
     _hiddenSize = hiddenSize;
 
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { _hiddenSize.x, _hiddenSize.y, 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
     _visibleLayers.resize(_visibleLayerDescs.size());
 
@@ -73,7 +73,7 @@ void PredictorLayer::createRandom(ComputeSystem &cs, ComputeProgram &program,
 
 void PredictorLayer::activate(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, bool threshold) {
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { _hiddenSize.x, _hiddenSize.y, 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
     // Start by clearing stimulus summation buffer to biases
     cs.getQueue().enqueueFillImage(_hiddenSummationTemp[_back], cl_float4{ 0.0f, 0.0f, 0.0f, 0.0f }, zeroOrigin, hiddenRegion);
@@ -117,7 +117,7 @@ void PredictorLayer::activate(ComputeSystem &cs, const std::vector<cl::Image2D> 
 
 void PredictorLayer::stepEnd(ComputeSystem &cs) {
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { _hiddenSize.x, _hiddenSize.y, 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
     std::swap(_hiddenStates[_front], _hiddenStates[_back]);
 
@@ -156,7 +156,7 @@ void PredictorLayer::clearMemory(ComputeSystem &cs) {
     cl_float4 zeroColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { _hiddenSize.x, _hiddenSize.y, 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
     // Clear buffers
     cs.getQueue().enqueueFillImage(_hiddenStates[_back], zeroColor, zeroOrigin, hiddenRegion);

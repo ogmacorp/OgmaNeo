@@ -25,8 +25,8 @@ void AgentLayer::createRandom(ComputeSystem &cs, ComputeProgram &program,
     _hiddenSize = { _numActionTiles.x * _actionTileSize.x, _numActionTiles.y * _actionTileSize.y };
 
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { _hiddenSize.x, _hiddenSize.y, 1 };
-    cl::array<cl::size_type, 3> actionRegion = { _numActionTiles.x, _numActionTiles.y, 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
+    cl::array<cl::size_type, 3> actionRegion = { static_cast<cl_uint>(_numActionTiles.x), static_cast<cl_uint>(_numActionTiles.y), 1 };
 
     _visibleLayers.resize(_visibleLayerDescs.size());
 
@@ -90,7 +90,7 @@ void AgentLayer::simStep(ComputeSystem &cs, float reward, const std::vector<cl::
     float qGamma, float qLambda, float epsilon, std::mt19937 &rng, bool learn)
 {
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { _hiddenSize.x, _hiddenSize.y, 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
     cs.getQueue().enqueueFillImage(_hiddenSummationTemp[_back], cl_float4{ 0.0f, 0.0f, 0.0f, 0.0f }, zeroOrigin, hiddenRegion);
 
@@ -137,7 +137,7 @@ void AgentLayer::simStep(ComputeSystem &cs, float reward, const std::vector<cl::
     {
         std::uniform_int_distribution<int> seedDist(0, 9999);
 
-        cl_uint2 seed = { seedDist(rng), seedDist(rng) };
+        cl_uint2 seed = { static_cast<cl_uint>(seedDist(rng)),static_cast<cl_uint>(seedDist(rng)) };
 
         int argIndex = 0;
 
@@ -208,8 +208,8 @@ void AgentLayer::clearMemory(ComputeSystem &cs) {
     cl_float4 zeroColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { _hiddenSize.x, _hiddenSize.y, 1 };
-    cl::array<cl::size_type, 3> actionRegion = { _numActionTiles.x, _numActionTiles.y, 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
+    cl::array<cl::size_type, 3> actionRegion = { static_cast<cl_uint>(_numActionTiles.x), static_cast<cl_uint>(_numActionTiles.y), 1 };
 
     // Clear buffers
     cs.getQueue().enqueueFillImage(_qStates[_back], zeroColor, zeroOrigin, hiddenRegion);
