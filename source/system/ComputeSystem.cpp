@@ -57,7 +57,7 @@ bool ComputeSystem::create(DeviceType type, bool createFromGLContext) {
         return false;
     }
 
-    _device = allDevices.front();
+    _device = allDevices.back();
 
 #ifdef SYS_DEBUG
     std::cout << "Using device: " << _device.getInfo<CL_DEVICE_NAME>() << std::endl;
