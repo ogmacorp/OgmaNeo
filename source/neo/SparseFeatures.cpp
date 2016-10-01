@@ -58,7 +58,7 @@ void SparseFeatures::createRandom(ComputeSystem &cs, ComputeProgram &program,
 
             vl._weights = createDoubleBuffer3D(cs, weightsSize, CL_R, CL_FLOAT);
 
-            randomUniform(vl._weights[_back], cs, randomUniform3DKernel, weightsSize, { 0.99f, 1.0f }, rng);
+            randomUniform(vl._weights[_back], cs, randomUniform3DKernel, weightsSize, { 0.0f, 1.0f }, rng);
         }
 
         vl._derivedInput = createDoubleBuffer2D(cs, vld._size, CL_R, CL_FLOAT);
