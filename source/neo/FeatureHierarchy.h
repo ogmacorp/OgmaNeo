@@ -97,8 +97,8 @@ namespace ogmaneo {
             LayerDesc()
                 : _size({ 8, 8 }),
                 _inputDescs({ InputDesc({ 16, 16 }, 6) }), _recurrentRadius(6), _inhibitionRadius(5),
-                _spFeedForwardWeightAlpha(0.1f), _spRecurrentWeightAlpha(0.1f), _spBiasAlpha(0.001f),
-                _spActiveRatio(0.04f)
+                _spFeedForwardWeightAlpha(0.25f), _spRecurrentWeightAlpha(0.25f), _spBiasAlpha(0.01f),
+                _spActiveRatio(0.02f)
             {}
 
             //!@{

@@ -238,7 +238,7 @@ void kernel spInhibit(read_only image2d_t activations,
                 float otherActivation = read_imagef(activations, defaultSampler, otherPosition).x;
 
                 inhibition += otherActivation >= activation ? 1.0f : 0.0f;
-                count++;
+                count += 1.0f;
 			}
 		}
 	
