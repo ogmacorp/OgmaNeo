@@ -1,7 +1,10 @@
-// --------------------------------------------------------------------------
-//	Ogma Toolkit(OTK)
-//	Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
-// --------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
 
 #include "SparseCoder.h"
 
@@ -22,7 +25,7 @@ void SparseCoder::createRandom(ComputeSystem &cs, ComputeProgram &program,
     _inhibitionRadius = inhibitionRadius;
 
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_int>(_hiddenSize.x), static_cast<cl_int>(_hiddenSize.y), 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
     _visibleLayers.resize(_visibleLayerDescs.size());
 
@@ -151,7 +154,7 @@ void SparseCoder::activate(ComputeSystem &cs, const std::vector<cl::Image2D> &vi
 
 void SparseCoder::stepEnd(ComputeSystem &cs) {
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_int>(_hiddenSize.x), static_cast<cl_int>(_hiddenSize.y), 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
     std::swap(_hiddenStates[_front], _hiddenStates[_back]);
 
@@ -233,7 +236,7 @@ void SparseCoder::clearMemory(ComputeSystem &cs) {
     cl_float4 zeroColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
-    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_int>(_hiddenSize.x), static_cast<cl_int>(_hiddenSize.y), 1 };
+    cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
     // Clear buffers
     cs.getQueue().enqueueFillImage(_hiddenStates[_back], zeroColor, zeroOrigin, hiddenRegion);
