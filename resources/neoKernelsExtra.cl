@@ -6,7 +6,7 @@
 // ----------------------------------------- Samplers -----------------------------------------
 
 constant sampler_t defaultSampler = CLK_NORMALIZED_COORDS_FALSE |
-    CLK_ADDRESS_NONE |
+    CLK_ADDRESS_CLAMP |
     CLK_FILTER_NEAREST;
 
 constant sampler_t normalizedClampedNearestSampler = CLK_NORMALIZED_COORDS_TRUE |
@@ -186,7 +186,7 @@ void kernel scStimulus(read_only image2d_t visibleStates,
                 float visibleState = read_imagef(visibleStates, defaultSampler, visiblePosition).x;
 
                 subSum += visibleState * weight;
-                count++;
+                count += 1.0f;
             }
         }
 
@@ -261,7 +261,7 @@ void kernel scSolveHidden(read_only image2d_t activations,
                 float otherActivation = read_imagef(activations, defaultSampler, otherPosition).x;
 
                 inhibition += otherActivation >= activation ? 1.0f : 0.0f;
-                count++;
+                count += 1.0f;
             }
         }
 
@@ -384,7 +384,7 @@ void kernel whiten(read_only image2d_t input, write_only image2d_t result, int2 
 
                 center += otherColor;
 
-                count++;
+                count += 1.0f;
             }
         }
 

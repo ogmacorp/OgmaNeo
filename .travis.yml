@@ -1,0 +1,70 @@
+# OgmaNeo
+# Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+#
+# This copy of OgmaNeo is licensed to you under the terms described
+# in the OGMANEO_LICENSE.md file included in this distribution.
+
+language: cpp
+
+sudo: required
+dist: trusty
+
+os:
+  # https://docs.travis-ci.com/user/trusty-ci-environment/
+  # Ubuntu 14.04 Trusty Tahr
+  - linux
+
+  # https://docs.travis-ci.com/user/osx-ci-environment/
+  # OS X 10.11.6 (and Xcode 7.3.1)
+  - osx
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      # C++11 compiler for Linux builds
+      - gcc-4.8
+      - g++-4.8
+
+cache:
+  directories:
+    - $HOME/.local
+
+before_install:
+  # Install dependencies into $HOME/.local
+  - bash ./.travis/install_deps.sh
+
+install:
+  # Install CMake v3.6 into $HOME/.local
+  - bash ./.travis/install_cmake.sh
+  
+  # Install OpenCL (Linux - POCL driver, release_0_13)
+  - bash ./.travis/install_opencl.sh
+
+script:
+  - echo Travis OS Name ... ${TRAVIS_OS_NAME}
+  - echo Travis build dir ... ${TRAVIS_BUILD_DIR}
+  - echo CMake Version .. $($HOME/.local/cmake/bin/cmake --version)
+
+  # Build the OgmaNeo library
+  - cd $TRAVIS_BUILD_DIR
+  - mkdir build
+  - cd build
+
+  - if [ $TRAVIS_OS_NAME == 'linux' ]; then
+      export CC=gcc-4.8;
+      export CXX=g++-4.8;
+    fi
+
+  - $HOME/.local/cmake/bin/cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=../install .. || travis_terminate 1;
+
+  - make
+  - make install
+
+notifications:
+  email:
+    recipients:
+      - rcrowder@ogmacorp.com
+    on_success: change
+    on_failure: always

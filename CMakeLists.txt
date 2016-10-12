@@ -19,13 +19,21 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 #endif()
 #message("Build type: ${CMAKE_BUILD_TYPE}")
 
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(BITNESS 64)
+else()
+  set(BITNESS 32)
+endif()
+#message("Bitness: ${BITNESS}")
+
 option(BUILD_SHARED_LIBS OFF)
 message(STATUS "Shared libs: ${BUILD_SHARED_LIBS}")
+
 
 include(ExternalProject)
 
 set(3RDPARTY_PATH "${CMAKE_CURRENT_BINARY_DIR}/3rdparty")
-include_directories("${3RDPARTY_PATH}/include")
+include_directories(BEFORE "${3RDPARTY_PATH}/include")
 link_directories("${3RDPARTY_PATH}/lib")
 
 
@@ -37,22 +45,95 @@ link_directories("${3RDPARTY_PATH}/lib")
 
 find_path(OPENCL_INCLUDE_DIRS 
     NAMES OpenCL/cl.h CL/cl.h
-    HINTS /usr/local/include/ $ENV{AMDAPPSDKROOT}/include/
+    HINTS
+        $ENV{AMDAPPSDKROOT}/include/
+        $ENV{INTELOCLSDKROOT}/include/
+        $ENV{CUDA_PATH}/include/
+        $ENV{OPENCL_ROOT}/include/
+    PATHS
+        /usr/include /usr/local/include/
 )
 
-find_library(OPENCL_LIBRARIES
-    NAMES OpenCL
-    HINTS /usr/local/lib/ $ENV{AMDAPPSDKROOT}/lib/x86_64/
-    PATH_SUFFIXES ${PLATFORM}${BITNESS} ${BITNESS_SUFFIX}
-)
+if(BITNESS EQUAL 64)
+    find_library(OPENCL_LIBRARIES
+        NAMES OpenCL
+        HINTS
+            $ENV{AMDAPPSDKROOT}/lib
+            $ENV{INTELOCLSDKROOT}/lib
+            $ENV{CUDA_PATH}/lib
+            $ENV{OPENCL_ROOT}/lib
+        PATH_SUFFIXES x86_64 x64
+        PATHS /usr/lib64 /usr/lib /usr/local/lib
+    )
+elseif(BITNESS EQUAL 32)
+    find_library(OPENCL_LIBRARIES
+        NAMES OpenCL
+        HINTS
+            $ENV{AMDAPPSDKROOT}/lib
+            $ENV{INTELOCLSDKROOT}/lib
+            $ENV{CUDA_PATH}/lib
+            $ENV{OPENCL_ROOT}/lib
+        PATH_SUFFIXES x86 Win32
+        PATHS /usr/lib32 /usr/lib /usr/local/lib
+    )
+endif()
+
+# Fall-back to find a POCL install
+if(OPENCL_LIBRARIES STREQUAL "")
+    find_library(OPENCL_LIBRARIES
+        NAMES pocl
+        HINTS $HOME/.local/pocl/lib /usr/lib64 /usr/lib /usr/local/lib
+    )
+endif()
 
 if(OPENCL_INCLUDE_DIRS STREQUAL "" OR OPENCL_LIBRARIES STREQUAL "")
     message(FATAL_ERROR "Could not locate OpenCL include & libs")
 else()
     message(STATUS "Found existing OpenCL in ${OPENCL_INCLUDE_DIRS}")
+    message(STATUS "Found existing OpenCL lib ${OPENCL_LIBRARIES}")
 endif()
 
 include_directories(${OPENCL_INCLUDE_DIRS})
+
+
+############################################################################
+# Find Khronos cl2.hpp include file
+
+find_file(CL2_HPP_DIR 
+    NAMES OpenCL/cl2.hpp CL/cl2.hpp
+    HINTS
+        $ENV{AMDAPPSDKROOT}/include/
+        $ENV{INTELOCLSDKROOT}/include/
+        $ENV{CUDA_PATH}/include/
+        $ENV{OPENCL_ROOT}/include/
+    PATHS
+        /usr/include /usr/local/include/
+)
+
+if ("${CL2_HPP_DIR}" STREQUAL "CL2_HPP_DIR-NOTFOUND")
+    message(STATUS "CL2 HPP not found!")
+
+    # The file DOWNLOAD using a https URL require that CMake contains SSL support
+    # By default CMake doesn't have SSL enabled. Only Mac OSX has this enabled,
+    # so restict the following cl2.hpp download to only Apple devices.
+
+    if(APPLE)
+        message(STATUS "Downloading cl2.hpp v2.0.10 into ${3RDPARTY_PATH}/include")
+        file(DOWNLOAD
+            https://github.com/KhronosGroup/OpenCL-CLHPP/releases/download/v2.0.10/cl2.hpp
+            ${3RDPARTY_PATH}/include/OpenCL/cl2.hpp
+            SHOW_PROGRESS
+            STATUS cl2_download_status
+            LOG cl2_download_log)
+
+        list(GET cl2_download_status 0 status_code)
+        list(GET cl2_download_status 1 status_string)
+
+        if(NOT status_code EQUAL 0)
+            message(FATAL_ERROR "Error: downloading cl2.hpp (code: ${status_code} - ${status_string} log: ${cl2_download_log}")
+        endif()
+    endif()
+endif()
 
 
 ############################################################################
@@ -68,7 +149,7 @@ else()
     ExternalProject_Add(
         FlatBuffers
         PREFIX FlatBuffers
-        URL "https://github.com/google/flatbuffers/archive/v1.4.0.zip"
+        GIT_REPOSITORY "https://github.com/google/flatbuffers.git"
         CMAKE_ARGS
             "-DFLATBUFFERS_BUILD_TESTS=OFF"
             "-DCMAKE_INSTALL_PREFIX=${3RDPARTY_PATH}"
@@ -200,4 +281,3 @@ configure_file(
 
 add_custom_target(UNINSTALL
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
-
