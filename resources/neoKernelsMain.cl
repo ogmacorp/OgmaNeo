@@ -6,7 +6,7 @@
 // ----------------------------------------- Samplers -----------------------------------------
 
 constant sampler_t defaultSampler = CLK_NORMALIZED_COORDS_FALSE |
-	CLK_ADDRESS_NONE |
+    CLK_ADDRESS_CLAMP |
 	CLK_FILTER_NEAREST;
 
 constant sampler_t normalizedClampedNearestSampler = CLK_NORMALIZED_COORDS_TRUE |
@@ -463,7 +463,7 @@ void kernel alLearnQ(read_only image2d_t hiddenStates,
 void kernel alActionToOneHot(read_only image2d_t hiddenStates, read_only image2d_t actions, write_only image2d_t oneHotActions, int2 subActionDims, uchar modulate) {
 	int2 position = (int2)(get_global_id(0), get_global_id(1));
 	
-    float hiddenState = modulate ? read_imagef(hiddenStates, position).x : 1.0f;
+    float hiddenState = modulate ? read_imagef(hiddenStates, defaultSampler, position).x : 1.0f;
 
 	float action = read_imagef(actions, defaultSampler, position).x;
 
@@ -508,7 +508,7 @@ void kernel alSetAction(read_only image2d_t modulator,
 {
 	int2 position = (int2)(get_global_id(0), get_global_id(1));
 	
-    float modulate = read_imagef(modulator, position).x;
+    float modulate = read_imagef(modulator, defaultSampler, position).x;
 
 	float action = read_imagef(actions, defaultSampler, position).x;
     float actionPrev = read_imagef(actionsPrev, defaultSampler, position).x;

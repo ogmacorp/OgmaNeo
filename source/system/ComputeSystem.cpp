@@ -30,7 +30,7 @@ bool ComputeSystem::create(DeviceType type, bool createFromGLContext) {
         return false;
     }
 #ifdef SYS_DEBUG
-        std::cout << allPlatforms.size() <<  " platforms found." << std::endl;
+    std::cout << allPlatforms.size() <<  " platforms found." << std::endl;
 #endif
 
     _platform = allPlatforms.front();

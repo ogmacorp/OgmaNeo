@@ -211,3 +211,6 @@ FakesAssemblies/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
+
+# MacOS cache
+.DS_Store
