@@ -1,4 +1,4 @@
-1.0.1 September 12, 2016
+1.0.1 October 12, 2016
 ========================
 
 - Travis CI integration
