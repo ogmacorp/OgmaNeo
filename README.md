@@ -123,7 +123,11 @@ The two main classes (Predictor and AgentSwarm) have several adjustable paramete
 
 OgmaNeo requires: a C++1x compiler, [CMake](https://cmake.org/), the [FlatBuffers](https://google.github.io/flatbuffers/) package (version 1.4.0), an OpenCL 1.2 SDK, and the Khronos Group cl2.hpp file.
 
-The library has been tested extensively on Windows using Microsoft Visual Studio 2013 and 2015, and on Linux using GCC 4.8 and upwards.
+The library has been tested extensively on:
+- Windows using Microsoft Visual Studio 2013 and 2015,
+- Linux using GCC 4.8 and upwards,
+- Mac OSX using Clang, and
+- Raspberry Pi3, using Raspbian Jessie with GCC 4.8
 
 ### CMake
 
@@ -135,11 +139,13 @@ The [CMakeLists.txt](https://github.com/ogmacorp/OgmaNeo/blob/master/CMakeLists.
 
 [OpenCL](https://www.khronos.org/opencl/) (Open Compute Language, version 1.2 and upwards) is used to compile, upload and run kernel code on CPU and GPU devices. An OpenCL SDK, with system drivers that support OpenCL 1.2, is required to build and use the OgmaNeo library.
 
-The open source POCL package ([Portable Computing Language](http://portablecl.org/)) can be used for devices that don't have OpenCL vendor driver support. For example the OgmaNeo library using POCL ([release branch 0.13](https://github.com/pocl/pocl/tree/release_0_13)) has been tested on the Raspberry Pi3.
+The open source POCL package ([Portable Computing Language](http://portablecl.org/)) can be used for devices that don't have OpenCL vendor driver support. For example the OgmaNeo library using POCL ([release branch 0.13](https://github.com/pocl/pocl/tree/release_0_13)) has been tested on the Raspberry Pi3 device and Travis-CI service.
 
 ### CL2 header file
 
 The Khronos Group [cl2.hpp](http://github.khronos.org/OpenCL-CLHPP/) header file is required when building OgmaNeo. And needs to be placed alongside your OpenCL header files. It can be downloaded from Github https://github.com/KhronosGroup/OpenCL-CLHPP/releases
+
+On Apple Mac OSX, if the `cl2.hpp` file cannot be found the `CMakeLists.txt` script will download the file and include it within library build process. On all other supported platforms the file requires a manual download and copy to the appropriate location (e.g. directory `/usr/include/CL`).
 
 ### Flatbuffers
 
@@ -150,6 +156,8 @@ The OgmaNeo CMake build system uses the `CMake\FindFlatBuffers.cmake` script to 
 If you do not already have the Flatbuffers package installed, the OgmaNeo CMakeLists.txt script will automatically download and build the package into a `3rdparty` directory local to the build.
 
 ## Building
+
+[![Build Status](https://travis-ci.org/ogmacorp/OgmaNeo.svg?branch=master)](https://travis-ci.org/ogmacorp/OgmaNeo)
 
 The following commands can be used to build the OgmaNeo library:
 
@@ -162,7 +170,7 @@ The `BUILD_SHARED_LIBS` boolean cmake option can be used to create dynamic/share
 
 `make install` can be run to install the library. `make uninstall` can be used to uninstall the library.
 
-On Windows it is recommended to use `cmake-gui` to define which generator to use and specify option build parameters.
+On Windows it is recommended to use `cmake-gui` to define which generator to use and specify build options.
 
 ## Contributions
 
