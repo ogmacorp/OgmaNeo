@@ -99,7 +99,7 @@ include_directories(${OPENCL_INCLUDE_DIRS})
 ############################################################################
 # Find Khronos cl2.hpp include file
 
-find_file(CL2_HPP_DIR 
+find_file(CL2_HPP_NAME
     NAMES OpenCL/cl2.hpp CL/cl2.hpp
     HINTS
         $ENV{AMDAPPSDKROOT}/include/
@@ -110,7 +110,7 @@ find_file(CL2_HPP_DIR
         /usr/include /usr/local/include/
 )
 
-if ("${CL2_HPP_DIR}" STREQUAL "CL2_HPP_DIR-NOTFOUND")
+if ("${CL2_HPP_NAME}" STREQUAL "CL2_HPP_NAME-NOTFOUND")
     message(STATUS "CL2 HPP not found!")
 
     # The file DOWNLOAD using a https URL require that CMake contains SSL support
@@ -122,7 +122,6 @@ if ("${CL2_HPP_DIR}" STREQUAL "CL2_HPP_DIR-NOTFOUND")
         file(DOWNLOAD
             https://github.com/KhronosGroup/OpenCL-CLHPP/releases/download/v2.0.10/cl2.hpp
             ${3RDPARTY_PATH}/include/OpenCL/cl2.hpp
-            SHOW_PROGRESS
             STATUS cl2_download_status
             LOG cl2_download_log)
 
@@ -133,6 +132,12 @@ if ("${CL2_HPP_DIR}" STREQUAL "CL2_HPP_DIR-NOTFOUND")
             message(FATAL_ERROR "Error: downloading cl2.hpp (code: ${status_code} - ${status_string} log: ${cl2_download_log}")
         endif()
     endif()
+else()
+    # Extract the directory
+    get_filename_component(CL2_HPP_DIR "${CL2_HPP_NAME}" DIRECTORY)
+    message(STATUS "CL2.HPP found in ${CL2_HPP_DIR}")
+
+    include_directories(SYSTEM "${CL2_HPP_DIR}")
 endif()
 
 
@@ -192,14 +197,16 @@ set(outFiles)
 
 # Find all OpenCL kernel files (note: not recursive)
 file(GLOB KERNEL_SRC
-          RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/resources"
-          "${CMAKE_CURRENT_SOURCE_DIR}/resources/*.cl")
+          RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/resources/kernels"
+          "${CMAKE_CURRENT_SOURCE_DIR}/resources/kernels/*.cl")
 message(STATUS "Found CL files - ${KERNEL_SRC}")
 
+set(infileCommon "${CMAKE_CURRENT_SOURCE_DIR}/resources/neoKernelsCommon.cl")
+    
 # Add a custom command to convert the OpenCL files into C++ header
 # files containing an appropriately name string const block
 foreach(ocl_filename ${KERNEL_SRC})
-    set(infile "${CMAKE_CURRENT_SOURCE_DIR}/resources/${ocl_filename}")
+	set(infile "${CMAKE_CURRENT_SOURCE_DIR}/resources/kernels/${ocl_filename}")
     #message(STATUS "Input file: ${infile}")
 
     # Extract the filename
@@ -214,8 +221,8 @@ foreach(ocl_filename ${KERNEL_SRC})
 
     add_custom_command(
         OUTPUT "${outfile}"
-	COMMAND OgmaOCLtoHpp "${infile}" "${outfile}" ${filename}
-        DEPENDS "${infile}" OgmaOCLtoHpp
+	COMMAND OgmaOCLtoHpp "${infileCommon}" "${infile}" "${outfile}" ${filename}
+        DEPENDS "${infileCommon}" "${infile}" OgmaOCLtoHpp
         VERBATIM)
 
     set(outFiles ${outFiles} "${outfile}")
@@ -248,6 +255,10 @@ if(BUILD_SHARED_LIBS)
 #                           EXPORT_FILE_NAME OgmaNeo_Export.h
 #                           STATIC_DEFINE OgmaNeo_BUILT_AS_STATIC
 #    )
+endif()
+
+if(MSVC)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
 # Main library depends upon Schema compilation

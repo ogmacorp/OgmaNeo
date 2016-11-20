@@ -8,7 +8,10 @@
 
 #pragma once
 
-#include "OgmaNeo.h"
+#include "system/SharedLib.h"
+#include "system/ComputeSystem.h"
+#include "system/ComputeProgram.h"
+#include "Helpers.h"
 #include "schemas/AgentLayer_generated.h"
 
 namespace ogmaneo {
@@ -31,7 +34,8 @@ namespace ogmaneo {
 
             cl_int _radius;
 
-            cl_float _alpha;
+            cl_float _qAlpha;
+            cl_float _actionAlpha;
             //!@}
 
             /*!
@@ -39,16 +43,17 @@ namespace ogmaneo {
             */
             VisibleLayerDesc()
                 : _size({ 16, 16 }),
-                _radius(10),
-                _alpha(0.01f)
+                _radius(12),
+                _qAlpha(0.001f),
+                _actionAlpha(0.02f)
             {}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::agent::VisibleLayerDesc* fbVisibleLayerDesc);
-            schemas::agent::VisibleLayerDesc save(flatbuffers::FlatBufferBuilder &builder);
+            void load(const schemas::VisibleAgentLayerDesc* fbVisibleAgentLayerDesc);
+            schemas::VisibleAgentLayerDesc save(flatbuffers::FlatBufferBuilder &builder);
             //!@}
         };
 
@@ -60,20 +65,26 @@ namespace ogmaneo {
             /*!
             \brief Layer data
             */
-            DoubleBuffer3D _weights;
+            DoubleBuffer3D _qWeights;
+            DoubleBuffer3D _actionWeights;
+
+            cl_float2 _qToVisible;
+            cl_float2 _visibleToQ;
+
+            cl_int2 _reverseRadiiQ;
 
             cl_float2 _hiddenToVisible;
             cl_float2 _visibleToHidden;
 
-            cl_int2 _reverseRadii;
+            cl_int2 _reverseRadiiHidden;
             //!@}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::agent::VisibleLayer* fbVisibleLayer, ComputeSystem &cs);
-            flatbuffers::Offset<schemas::agent::VisibleLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::VisibleAgentLayer* fbVisibleAgentLayer, ComputeSystem &cs);
+            flatbuffers::Offset<schemas::VisibleAgentLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
@@ -99,17 +110,20 @@ namespace ogmaneo {
         Q states, actions, td errors, one hot action
         */
         DoubleBuffer2D _qStates;
+        DoubleBuffer2D _actionProbabilities;
 
-        DoubleBuffer2D _action;
         DoubleBuffer2D _actionTaken;
         cl::Image2D _tdError;
         cl::Image2D _oneHotAction;
         //!@}
 
+        //!@{
         /*!
-        \brief Hidden stimulus summation temporary buffer
+        \brief Hidden stimulus summation temporary buffers
         */
-        DoubleBuffer2D _hiddenSummationTemp;
+        DoubleBuffer2D _hiddenSummationTempQ;
+        DoubleBuffer2D _hiddenSummationTempHidden;
+        //!@}
 
         //!@{
         /*!
@@ -123,12 +137,12 @@ namespace ogmaneo {
         /*!
         \brief Additional kernels
         */
-        cl::Kernel _findQKernel;
+        cl::Kernel _activateKernel;
         cl::Kernel _learnQKernel;
+        cl::Kernel _learnActionsKernel;
         cl::Kernel _actionToOneHotKernel;
         cl::Kernel _getActionKernel;
         cl::Kernel _setActionKernel;
-        cl::Kernel _actionExplorationKernel;
         //!@}
 
     public:
@@ -168,7 +182,7 @@ namespace ogmaneo {
         \param learn optional argument to disable learning.
         */
         void simStep(ComputeSystem &cs, float reward, const std::vector<cl::Image2D> &visibleStates, const cl::Image2D &modulator,
-            float qGamma, float qLambda, float epsilon, std::mt19937 &rng, bool learn = true);
+            float qGamma, float qLambda, float actionLambda, float maxActionWeightMag, std::mt19937 &rng, bool learn = true);
 
         /*!
         \brief Clear memory (recurrent data)
@@ -204,6 +218,13 @@ namespace ogmaneo {
         */
         const DoubleBuffer2D &getQStates() const {
             return _qStates;
+        }
+
+        /*!
+        \brief Get the hidden action activations
+        */
+        const DoubleBuffer2D &getActionActivations() const {
+            return _actionProbabilities;
         }
 
         /*!
@@ -245,8 +266,8 @@ namespace ogmaneo {
         /*!
         \brief Serialization
         */
-        void load(const schemas::agent::AgentLayer* fbAgentLayer, ComputeSystem &cs);
-        flatbuffers::Offset<schemas::agent::AgentLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+        void load(const schemas::AgentLayer* fbAgentLayer, ComputeSystem &cs);
+        flatbuffers::Offset<schemas::AgentLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
         //!@}
     };
 }

@@ -13,13 +13,6 @@
 using namespace ogmaneo;
 
 bool ComputeSystem::create(DeviceType type, bool createFromGLContext) {
-    if (type == _none) {
-#ifdef SYS_DEBUG
-        std::cout << "No OpenCL context created." << std::endl;
-#endif
-        return true;
-    }
-
     std::vector<cl::Platform> allPlatforms;
     cl::Platform::get(&allPlatforms);
 
@@ -51,6 +44,33 @@ bool ComputeSystem::create(DeviceType type, bool createFromGLContext) {
     case _all:
         _platform.getDevices(CL_DEVICE_TYPE_ALL, &allDevices);
         break;
+    }
+
+    if (!allDevices.empty()) {
+        _device = allDevices.front();
+
+        std::vector<size_t> workItemSizes;
+        _device.getInfo(CL_DEVICE_MAX_WORK_ITEM_SIZES, &workItemSizes);
+
+        // Catch incompatible work item sizes (e.g. Apple _cpu device that uses [1024,1,1])
+        if (workItemSizes[0] <= 1 || workItemSizes[1] <= 1 || workItemSizes[2] <= 1) {
+#ifdef SYS_DEBUG
+            std::cerr << "Incompatible device type (unsupported work item size)." << std::endl;
+#endif
+
+            if (type != _gpu) {
+#ifdef SYS_DEBUG
+                std::cout << "Fallback to trying a _gpu device type." << std::endl;
+#endif
+                _platform.getDevices(CL_DEVICE_TYPE_GPU, &allDevices);
+            }
+            else {
+#ifdef SYS_DEBUG
+                std::cerr << "Requested DeviceType is not compatible." << std::endl;
+#endif
+                return false;
+            }
+        }
     }
 
     if (allDevices.empty()) {

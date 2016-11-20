@@ -57,9 +57,9 @@ fi
 
 #----------------------------------------
 # Test OpenCL using Oblomov's clinfo
-cd $TRAVIS_BUILD_DIR
-
-git clone https://github.com/Oblomov/clinfo.git
-cd clinfo
-make
-./clinfo
+#cd $TRAVIS_BUILD_DIR
+#
+#git clone https://github.com/Oblomov/clinfo.git
+#cd clinfo
+#make
+#./clinfo

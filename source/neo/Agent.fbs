@@ -9,20 +9,14 @@
 include "Helpers.fbs";
 include "AgentSwarm.fbs";
 
-namespace ogmaneo.schemas.agent;
+namespace ogmaneo.schemas;
 
 table Agent {
     _as:AgentSwarm;
-    _inputWidth:int;
-    _inputHeight:int;
-    _actionWidth:int;
-    _actionHeight:int;
-    _actionTileWidth:int;
-    _actionTileHeight:int;
-    _inputImage:Image2D;
-    _action:[float];
+    _inputImages:[Image2D];
+    _actions:[ValueField2D];
 }
 
 root_type Agent;
-file_identifier "OASB";
-file_extension "oas";
+file_identifier "OAGT";
+file_extension "oag";

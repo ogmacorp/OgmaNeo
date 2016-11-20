@@ -8,74 +8,72 @@
 
 #pragma once
 
+#include "system/SharedLib.h"
 #include "Predictor.h"
-#include "LayerDescs.h"
+#include "Architect.h"
 #include "schemas/Hierarchy_generated.h"
 
 namespace ogmaneo {
+    // Declarations required for SWIG
+    class ValueField2D;
+    class Predictor;
+
     /*!
-    \brief Default Hierarchy implementation (FeatureHierarchy)
+    \brief Default Hierarchy implementation (Predictor)
     */
-    class Hierarchy {
+    class OGMA_API Hierarchy {
     private:
         /*!
-        \brief Internal OgmaNeo hiearchy
+        \brief Internal OgmaNeo agent
         */
-        Predictor _ph;
-
-        int _inputWidth, _inputHeight;
+        Predictor _p;
 
         std::mt19937 _rng;
 
-        cl::Image2D _inputImage;
+        std::vector<cl::Image2D> _inputImages;
 
+        std::vector<ValueField2D> _predictions;
+
+        std::shared_ptr<Resources> _resources;
+
+        std::vector<PredictorLayer> _readoutLayers;
+
+        //!@{
         /*!
-        \brief Prediction vector
+        \brief Serialization
         */
-        std::vector<float> _pred;
-
-        ComputeSystem* _pCs;
-
-        void load(const schemas::hierarchy::Hierarchy* fbFH, ComputeSystem &cs);
-        flatbuffers::Offset<schemas::hierarchy::Hierarchy> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+        void load(const ogmaneo::schemas::Hierarchy* fbHierarchy, ComputeSystem &cs);
+        flatbuffers::Offset<ogmaneo::schemas::Hierarchy> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+        //!@}
 
     public:
         /*!
-        \brief Create the Hierarchy
-        \param cs is the ComputeSystem.
-        \param program is the ComputeProgram associated with the ComputeSystem and loaded with the main kernel code.
-        \param inputWidth is the width of input to the hierarchy.
-        \param inputHeight is the height of input to the hierarchy.
-        \param layerDescs provide layer descriptors for hierachy.
-        \param initMinWeight is the minimum value for weight initialization.
-        \param initMaxWeight is the maximum value for weight initialization.
-        \param seed a random number generator seed.
-        */
-        Hierarchy(ComputeSystem &cs, ComputeProgram &program,
-            int inputWidth, int inputHeight,
-            const std::vector<LayerDescs> &layerDescs,
-            float initMinWeight, float initMaxWeight, int seed);
-
-        /*!
         \brief Run a single simulation tick
-        \param inputs the inputs to the bottom-most layer.
-        \param learn optional argument to disable learning.
         */
-        void simStep(const std::vector<float> &inputs, bool learn);
+        void simStep(std::vector<ValueField2D> &inputs, bool learn = true);
 
         /*!
-        \brief Get the current prediction vector
+        \brief Get the action vector
         */
-        const std::vector<float> &getPrediction() const {
-            return _pred;
+        const std::vector<ValueField2D> &getPredictions() const {
+            return _predictions;
+        }
+
+        /*!
+        \brief Access underlying Predictor
+        */
+        Predictor &getPredictor() {
+            return _p;
         }
 
         //!@{
         /*!
         \brief Serialization
         */
-        void load(ComputeSystem &cs, ComputeProgram &prog, const std::string &fileName);
+        void load(ComputeSystem &cs, const std::string &fileName);
         void save(ComputeSystem &cs, const std::string &fileName);
         //!@}
+
+        friend class Architect;
     };
 }

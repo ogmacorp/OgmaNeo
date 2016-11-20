@@ -1,0 +1,52 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+include "Helpers.fbs";
+include "SparseFeatures.fbs";
+
+namespace ogmaneo.schemas;
+
+table Parameter {
+    _key:string;
+    _value:string;
+}
+
+table ParameterModifier {
+    _target:[Parameter];
+}
+
+table InputLayer {
+    _size:Vec2i;
+    _params:[Parameter];
+}
+
+enum SparseFeaturesTypeEnum : byte {
+    _stdp, _delay, _chunk
+}
+
+table ActionLayer {
+    _size:Vec2i;
+    _tileSize:Vec2i;
+    _params:[Parameter];
+}
+
+table HigherLayer {
+    _size:Vec2i;
+    _type:SparseFeaturesTypeEnum;
+    _params:[Parameter];
+}
+
+table Architect {
+    _inputLayers:[InputLayer];
+    _actionLayers:[ActionLayer];
+    _higherLayers:[HigherLayer];
+}
+
+root_type Architect;
+file_identifier "OARC";
+file_extension "oar";

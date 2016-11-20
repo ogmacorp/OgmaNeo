@@ -8,17 +8,17 @@
 
 include "Helpers.fbs";
 include "Predictor.fbs";
+include "PredictorLayer.fbs";
 
-namespace ogmaneo.schemas.hierarchy;
+namespace ogmaneo.schemas;
 
 table Hierarchy {
-    _ph:predictor.Predictor;
-    _inputWidth:int;
-    _inputHeight:int;
-    _inputImage:Image2D;
-    _pred:[float];
+    _p:Predictor;
+    _inputImages:[Image2D];
+    _predictions:[ValueField2D];
+    _readoutLayers:[PredictorLayer];
 }
 
 root_type Hierarchy;
-file_identifier "OFHB";
-file_extension "ofh";
+file_identifier "OHRY";
+file_extension "ohr";

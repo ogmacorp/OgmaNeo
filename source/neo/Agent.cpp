@@ -12,107 +12,55 @@
 
 using namespace ogmaneo;
 
-Agent::Agent(ComputeSystem &cs, ComputeProgram &prog,
-    int inputWidth, int inputHeight,
-    int actionWidth, int actionHeight,
-    int actionTileWidth, int actionTileHeight,
-    int actionRadius,
-    const std::vector<LayerDescs> &layerDescs,
-    float initMinWeight, float initMaxWeight, int seed)
-{
-    _pCs = &cs;
-    _rng.seed(seed);
+void Agent::simStep(float reward, std::vector<ValueField2D> &inputs, bool learn) {
+    // Write input
+    for (int i = 0; i < _inputImages.size(); i++)
+        _resources->_cs->getQueue().enqueueWriteImage(_inputImages[i], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(inputs[i].getSize().x), static_cast<cl::size_type>(inputs[i].getSize().y), 1 }, 0, 0, inputs[i].getData().data());
 
-    _inputWidth = inputWidth;
-    _inputHeight = inputHeight;
-    _actionWidth = actionWidth;
-    _actionHeight = actionHeight;
-    _actionTileWidth = actionTileWidth;
-    _actionTileHeight = actionTileHeight;
+    _as.simStep(*_resources->_cs, reward, _inputImages, _inputImages, _rng, learn);
 
-    cl_int2 inputSize = { inputWidth, inputHeight };
-    cl_int2 actionSize = { actionWidth, actionHeight };
+    // Get actions
+    for (int i = 0; i < _actions.size(); i++)
+        _resources->_cs->getQueue().enqueueReadImage(_as.getAction(i), CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(_actions[i].getSize().x), static_cast<cl::size_type>(_actions[i].getSize().y), 1 }, 0, 0, _actions[i].getData().data());
+}
 
-    std::vector<AgentSwarm::AgentLayerDesc> aLayerDescs(layerDescs.size());
-    std::vector<FeatureHierarchy::LayerDesc> hLayerDescs(layerDescs.size());
-
-    for (int l = 0; l < layerDescs.size(); l++) {
-        hLayerDescs[l]._size = cl_int2{ layerDescs[l]._width, layerDescs[l]._height };
-        hLayerDescs[l]._inputDescs = { FeatureHierarchy::InputDesc(inputSize, layerDescs[l]._feedForwardRadius) };
-        hLayerDescs[l]._inhibitionRadius = layerDescs[l]._inhibitionRadius;
-        hLayerDescs[l]._recurrentRadius = layerDescs[l]._recurrentRadius;
-        hLayerDescs[l]._spFeedForwardWeightAlpha = layerDescs[l]._spFeedForwardWeightAlpha;
-        hLayerDescs[l]._spRecurrentWeightAlpha = layerDescs[l]._spRecurrentWeightAlpha;
-        hLayerDescs[l]._spBiasAlpha = layerDescs[l]._spBiasAlpha;
-        hLayerDescs[l]._spActiveRatio = layerDescs[l]._spActiveRatio;
-
-        aLayerDescs[l]._radius = layerDescs[l]._qRadius;     
-        aLayerDescs[l]._qAlpha = layerDescs[l]._qAlpha;
-        aLayerDescs[l]._qGamma = layerDescs[l]._qGamma;
-        aLayerDescs[l]._qLambda = layerDescs[l]._qLambda;
-        aLayerDescs[l]._epsilon = layerDescs[l]._epsilon;
+void Agent::load(const schemas::Agent* fbAgent, ComputeSystem &cs) {
+    if (!_inputImages.empty()) {
+        assert(_inputImages.size() == fbAgent->_inputImages()->Length());
+        assert(_actions.size() == fbAgent->_actions()->Length());
+    }
+    else {
+        _inputImages.reserve(fbAgent->_inputImages()->Length());
+        _actions.reserve(fbAgent->_actions()->Length());
     }
 
-    _as.createRandom(cs, prog, inputSize, actionSize, { actionTileWidth, actionTileHeight }, actionRadius, aLayerDescs, hLayerDescs, cl_float2{ initMinWeight, initMaxWeight }, _rng);
-
-    // Create temporary buffers
-    _inputImage = cl::Image2D(cs.getContext(), CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), inputWidth, inputHeight);
-
-    _action.clear();
-    _action.assign(actionWidth * actionHeight, 0.0f);
-}
-
-void Agent::simStep(float reward, const std::vector<float> &inputs, bool learn) {
-    assert(inputs.size() == _inputWidth * _inputHeight);
-
-    std::vector<float> inputsf = inputs;
-
-    // Write input
-    _pCs->getQueue().enqueueWriteImage(_inputImage, CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(_inputWidth), static_cast<cl::size_type>(_inputHeight), 1 }, 0, 0, inputsf.data());
-
-    _as.simStep(*_pCs, reward, _inputImage, _rng, learn);
-
-    // Get action
-    _pCs->getQueue().enqueueReadImage(_as.getAction(), CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(_actionWidth), static_cast<cl::size_type>(_actionHeight), 1 }, 0, 0, _action.data());
-}
-
-std::vector<float> Agent::getStates(int li) {
-    std::vector<float> states(_as.getHierarchy().getLayerDesc(li)._size.x * _as.getHierarchy().getLayerDesc(li)._size.y * 2);
-
-    _pCs->getQueue().enqueueReadImage(_as.getHierarchy().getLayer(li)._sp.getHiddenStates()[_back], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(_as.getHierarchy().getLayerDesc(li)._size.x), static_cast<cl::size_type>(_as.getHierarchy().getLayerDesc(li)._size.y), 1 }, 0, 0, states.data());
-
-    return states;
-}
-
-void Agent::load(const schemas::agent::Agent* fbAgent, ComputeSystem &cs) {
     _as.load(fbAgent->_as(), cs);
 
-    _inputWidth = fbAgent->_inputWidth();
-    _inputHeight = fbAgent->_inputHeight();
-    _actionWidth = fbAgent->_actionWidth();
-    _actionHeight = fbAgent->_actionHeight();
-    _actionTileWidth = fbAgent->_actionTileWidth();
-    _actionTileHeight = fbAgent->_actionTileHeight();
+    for (flatbuffers::uoffset_t i = 0; i < fbAgent->_inputImages()->Length(); i++) {
+        ogmaneo::load(_inputImages[i], fbAgent->_inputImages()->Get(i), cs);
+    }
 
-    ogmaneo::load(_inputImage, fbAgent->_inputImage(), cs);
-
-    _action.clear();
-    for (flatbuffers::uoffset_t i = 0; i < fbAgent->_action()->Length(); i++) {
-        _action.push_back(fbAgent->_action()->Get(i));
+    for (flatbuffers::uoffset_t i = 0; i < fbAgent->_actions()->Length(); i++) {
+        _actions[i].load(fbAgent->_actions()->Get(i), cs);
     }
 }
 
-flatbuffers::Offset<schemas::agent::Agent> Agent::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
-    return schemas::agent::CreateAgent(builder,
+flatbuffers::Offset<schemas::Agent> Agent::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
+    std::vector<flatbuffers::Offset<schemas::Image2D>> inputImages;
+    for (cl::Image2D image : _inputImages)
+        inputImages.push_back(ogmaneo::save(image, builder, cs));
+
+    std::vector<flatbuffers::Offset<schemas::ValueField2D>> actions;
+    for (ValueField2D values : _actions)
+        actions.push_back(values.save(builder, cs));
+
+    return schemas::CreateAgent(builder,
         _as.save(builder, cs),
-        _inputWidth, _inputHeight,
-        _actionWidth, _actionHeight,
-        _actionTileWidth, _actionTileHeight,
-        ogmaneo::save(_inputImage, builder, cs),
-        builder.CreateVector(_action));
+        builder.CreateVector(inputImages),
+        builder.CreateVector(actions));
 }
 
-void Agent::load(ComputeSystem &cs, ComputeProgram &prog, const std::string &fileName) {
+void Agent::load(ComputeSystem &cs, const std::string &fileName) {
     FILE* file = fopen(fileName.c_str(), "rb");
     fseek(file, 0L, SEEK_END);
     size_t length = ftell(file);
@@ -124,13 +72,13 @@ void Agent::load(ComputeSystem &cs, ComputeProgram &prog, const std::string &fil
     flatbuffers::Verifier verifier = flatbuffers::Verifier(data.data(), length);
 
     bool verified =
-        schemas::agent::VerifyAgentBuffer(verifier) |
-        schemas::agent::AgentBufferHasIdentifier(data.data());
+        schemas::VerifyAgentBuffer(verifier) |
+        schemas::AgentBufferHasIdentifier(data.data());
 
     if (verified) {
-        const schemas::agent::Agent* na = schemas::agent::GetAgent(data.data());
+        const schemas::Agent* agent = schemas::GetAgent(data.data());
 
-        load(na, cs);
+        load(agent, cs);
     }
 
     return; //verified;
@@ -139,20 +87,20 @@ void Agent::load(ComputeSystem &cs, ComputeProgram &prog, const std::string &fil
 void Agent::save(ComputeSystem &cs, const std::string &fileName) {
     flatbuffers::FlatBufferBuilder builder;
 
-    flatbuffers::Offset<schemas::agent::Agent> agent = save(builder, cs);
+    flatbuffers::Offset<schemas::Agent> agent = save(builder, cs);
 
     // Instruct the builder that this Agent is complete.
-    schemas::agent::FinishAgentBuffer(builder, agent);
+    schemas::FinishAgentBuffer(builder, agent);
 
-    // Get the built agent and size
+    // Get the built buffer and size
     uint8_t *buf = builder.GetBufferPointer();
     size_t size = builder.GetSize();
 
     flatbuffers::Verifier verifier = flatbuffers::Verifier(buf, size);
 
     bool verified =
-        schemas::agent::VerifyAgentBuffer(verifier) |
-        schemas::agent::AgentBufferHasIdentifier(buf);
+        schemas::VerifyAgentBuffer(verifier) |
+        schemas::AgentBufferHasIdentifier(buf);
 
     if (verified) {
         FILE* file = fopen(fileName.c_str(), "wb");
