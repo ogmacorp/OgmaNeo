@@ -7,31 +7,27 @@
 // ----------------------------------------------------------------------------
 
 include "Helpers.fbs";
+include "SparseFeaturesChunk.fbs";
+include "SparseFeaturesDelay.fbs";
+include "SparseFeaturesSTDP.fbs";
 
-namespace ogmaneo.schemas.hierarchy;
+namespace ogmaneo.schemas;
 
-struct VisibleLayerDesc {
-	_size:int2;
-	_radius:int;
-	_ignoreMiddle:ubyte;
-	_weightAlpha:float;
+enum InputType : byte {
+    _feedForward, _feedForwardRecurrent
 }
 
-table VisibleLayer {
-	_derivedInput:DoubleBuffer2D;
-	_weights:DoubleBuffer3D;
-	_hiddenToVisible:float2;
-	_visibleToHidden:float2;
-	_reverseRadii:int2;
+table SparseFeaturesDesc {
+	_name:string;
+	_inputType:InputType;
+}
+
+union SparseFeaturesType {
+    SparseFeaturesChunk,
+    SparseFeaturesDelay,
+    SparseFeaturesSTDP
 }
 
 table SparseFeatures {
-	_hiddenActivations:DoubleBuffer2D;
-	_hiddenStates:DoubleBuffer2D;
-	_hiddenBiases:DoubleBuffer2D;
-	_hiddenSize:int2;
-	_inhibitionRadius:int;
-	_hiddenSummationTemp:DoubleBuffer2D;
-	_visibleLayerDescs:[VisibleLayerDesc];
-	_visibleLayers:[VisibleLayer];
+    _sf:SparseFeaturesType;
 }

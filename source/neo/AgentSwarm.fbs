@@ -7,22 +7,34 @@
 // ----------------------------------------------------------------------------
 
 include "Helpers.fbs";
-include "FeatureHierarchy.fbs";
+include "Predictor.fbs";
 include "AgentLayer.fbs";
 
 namespace ogmaneo.schemas;
 
-struct AgentLayerDesc {
+table AgentSwarmLayerDesc {
     _radius:int;
     _qAlpha:float;
+	_actionAlpha:float;
     _qGamma:float;
     _qLambda:float;
-    _epsilon:float;
+	_actionLambda:float;
+	_maxActionWeightMag:float;
+}
+
+table AgentSwarmLayerDescs {
+    _layerDescs:[AgentSwarmLayerDesc];
+}
+
+table AgentSwarmLayers {
+    _layers:[AgentLayer];
 }
 
 table AgentSwarm {
-    _h:hierarchy.FeatureHierarchy;
-    _ones:Image2D;
-    _aLayers:[agent.AgentLayer];
-    _aLayerDescs:[AgentLayerDesc];
+    _p:Predictor;
+    _aLayers:[AgentSwarmLayers];
+    _aLayerDescs:[AgentSwarmLayerDescs];
+    _rewardSums:[float];
+    _rewardCounts:[float];
+    _ones:[Image2D];
 }

@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "OgmaNeo.h"
-#include "FeatureHierarchy.h"
+#include "system/SharedLib.h"
+#include "Predictor.h"
 #include "AgentLayer.h"
 #include "schemas/AgentSwarm_generated.h"
 
@@ -33,25 +33,28 @@ namespace ogmaneo {
             \brief Q learning parameters
             */
             cl_float _qAlpha;
+            cl_float _actionAlpha;
             cl_float _qGamma;
             cl_float _qLambda;
-            cl_float _epsilon;
+            cl_float _actionLambda;
+            cl_float _maxActionWeightMag;
             //!@}
 
             /*!
             \brief Initialize defaults
             */
             AgentLayerDesc()
-                : _radius(12), _qAlpha(0.00004f),
-                _qGamma(0.99f), _qLambda(0.98f), _epsilon(0.06f)
+                : _radius(12), _qAlpha(0.01f), _actionAlpha(0.1f),
+                _qGamma(0.99f), _qLambda(0.98f), _actionLambda(0.98f),
+                _maxActionWeightMag(10.0f)
             {}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::AgentLayerDesc* fbAgentLayerDesc);
-            schemas::AgentLayerDesc save(flatbuffers::FlatBufferBuilder &builder);
+            void load(const schemas::AgentSwarmLayerDesc* fbAgentSwarmLayerDesc);
+            flatbuffers::Offset<schemas::AgentSwarmLayerDesc> save(flatbuffers::FlatBufferBuilder &builder);
             //!@}
         };
 
@@ -59,20 +62,23 @@ namespace ogmaneo {
         /*!
         \brief Feature hierarchy with same dimensions as swarm layer
         */
-        FeatureHierarchy _h;
+        Predictor _p;
 
         //!@{
         /*!
         \brief Layers and descs
+        2D since layers can produce actions for multiple targets
         */
-        std::vector<AgentLayer> _aLayers;
-        std::vector<AgentLayerDesc> _aLayerDescs;
+        std::vector<std::vector<AgentLayer>> _aLayers;
+        std::vector<std::vector<AgentLayerDesc>> _aLayerDescs;
+        std::vector<float> _rewardSums;
+        std::vector<float> _rewardCounts;
         //!@}
 
         /*!
         \brief All ones image for first layer modulation
         */
-        cl::Image2D _ones;
+        std::vector<cl::Image2D> _ones;
 
     public:
         /*!
@@ -95,9 +101,10 @@ namespace ogmaneo {
         \param initWeightRange are the minimum and maximum range values for weight initialization.
         \param rng a random number generator.
         */
-        void createRandom(ComputeSystem &cs, ComputeProgram &program,
-            cl_int2 inputSize, cl_int2 actionSize, cl_int2 actionTileSize, cl_int actionRadius,
-            const std::vector<AgentLayerDesc> &aLayerDescs,
+        void createRandom(ComputeSystem &cs, ComputeProgram &hProgram, ComputeProgram &pProgram, ComputeProgram &asProgram,
+            const std::vector<cl_int2> &actionSizes, const std::vector<cl_int2> actionTileSizes,
+            const std::vector<std::vector<AgentLayerDesc>> &aLayerDescs,
+            const std::vector<Predictor::PredLayerDesc> &pLayerDescs,
             const std::vector<FeatureHierarchy::LayerDesc> &hLayerDescs,
             cl_float2 initWeightRange, std::mt19937 &rng);
 
@@ -110,7 +117,7 @@ namespace ogmaneo {
         \param rng a random number generator.
         \param learn optional argument to disable learning.
         */
-        void simStep(ComputeSystem &cs, float reward, const cl::Image2D &input, std::mt19937 &rng, bool learn = true);
+        void simStep(ComputeSystem &cs, float reward, const std::vector<cl::Image2D> &inputs, const std::vector<cl::Image2D> &inputsCorrupted, std::mt19937 &rng, bool learn = true);
 
         /*!
         \brief Get number of agent (swarm) layers
@@ -123,14 +130,14 @@ namespace ogmaneo {
         /*!
         \brief Get access to an agent layer
         */
-        const AgentLayer &getAgentLayer(int index) const {
+        const std::vector<AgentLayer> &getAgentLayer(int index) const {
             return _aLayers[index];
         }
 
         /*!
         \brief Get access to an agent layer descriptor
         */
-        const AgentLayerDesc &getAgentLayerDesc(int index) const {
+        const std::vector<AgentLayerDesc> &getAgentLayerDesc(int index) const {
             return _aLayerDescs[index];
         }
 
@@ -139,15 +146,15 @@ namespace ogmaneo {
         Returns float 2D image where each element is actually an integer, representing the index of the select action for each tile.
         To get continuous values, divide each tile index by the number of elements in a tile (actionTileSize.x * actionTileSize.y).
         */
-        const cl::Image2D &getAction() const {
-            return _aLayers.back().getActions()[_back];
+        const cl::Image2D &getAction(int index) const {
+            return _aLayers.back()[index].getActions()[_back];
         }
 
         /*!
         \brief Get the underlying feature hierarchy
         */
-        FeatureHierarchy &getHierarchy() {
-            return _h;
+        Predictor &getPredictor() {
+            return _p;
         }
 
         //!@{

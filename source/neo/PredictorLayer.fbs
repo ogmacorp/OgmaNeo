@@ -7,26 +7,29 @@
 // ----------------------------------------------------------------------------
 
 include "Helpers.fbs";
+include "SparseFeatures.fbs";
 
-namespace ogmaneo.schemas.predictor;
+namespace ogmaneo.schemas;
 
-struct VisibleLayerDesc {
+struct VisiblePredictorLayerDesc {
 	_size:int2;
 	_radius:int;
 	_alpha:float;
 }
 
-table VisibleLayer {
+table VisiblePredictorLayer {
+    _derivedInput:DoubleBuffer2D;
 	_weights:DoubleBuffer3D;
 	_hiddenToVisible:float2;
 	_visibleToHidden:float2;
 	_reverseRadii:int2;
 }
 
-table Layer {
+table PredictorLayer {
 	_hiddenSize:int2;
 	_hiddenSummationTemp:DoubleBuffer2D;
 	_hiddenStates:DoubleBuffer2D;
-	_visibleLayerDescs:[VisibleLayerDesc];
-	_visibleLayers:[VisibleLayer];
+    _inhibitSparseFeatures:SparseFeatures;
+	_visibleLayerDescs:[VisiblePredictorLayerDesc];
+	_visibleLayers:[VisiblePredictorLayer];
 }

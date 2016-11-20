@@ -36,7 +36,7 @@ namespace ogmaneo {
         \brief OpenCL device types
         */
         enum DeviceType {
-            _cpu, _gpu, _all, _none
+            _cpu, _gpu, _all
         };
 
     private:

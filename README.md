@@ -14,9 +14,10 @@ Welcome to [Ogma Intelligent Systems Corp](https://ogmacorp.com) OgmaNeo library
 
 The current release of this library contains a form of Sparse Predictive Hierarchies. Refer to the arXiv.org paper for further details.
 
-Two other OgmaCorp GitHub repositories contain:
-- Examples using this library ([OgmaNeoDemos](https://github.com/ogmacorp/OgmaNeoDemos)), and
-- Python bindings to this library ([PyOgmaNeo](https://github.com/ogmacorp/PyOgmaNeo)).
+Three other OgmaCorp GitHub repositories contain:
+- Examples using this library ([OgmaNeoDemos](https://github.com/ogmacorp/OgmaNeoDemos))
+- Python bindings to this library ([PyOgmaNeo](https://github.com/ogmacorp/PyOgmaNeo))
+- Java (JNI) bindings to this library ([JOgmaNeo](https://github.com/ogmacorp/JOgmaNeo))
 
 ## Overview
 
@@ -27,107 +28,158 @@ OgmaNeo is a fully online learning algorithm, so data must be passed in an appro
 The simplest usage of the predictive hierarchy involves calling:
 
 ```cpp
-	#include <OgmaNeo.h>
+    #include <neo/Architect.h>
+    #include <neo/Hierarchy.h>
+
 	using namespace ogmaneo;
 
-	// Define a pseudo random number generator
-	std::mt19937 generator(time(nullptr));
+    // Create the Resources and main ComputeSystem
+    std::shared_ptr<ogmaneo::Resources> res = std::make_shared<ogmaneo::Resources>();
 
-	// Create the main compute system interface
-	ComputeSystem cs;
-	cs.create(ComputeSystem::_gpu);
+    res->create(ogmaneo::ComputeSystem::_gpu);
 
-	// Load the main kernel code
-	ComputeProgram prog;
-	prog.loadMainKernel(cs);
+    // Use the Architect to build the desired hierarchy
+    ogmaneo::Architect arch;
+    arch.initialize(1234, res);
 
-	// --------------------------- Create the Predictive Hierarchy ---------------------------
+    // 1 input layer
+    arch.addInputLayer(ogmaneo::Vec2i(4, 4))
+        .setValue("in_p_alpha", 0.02f)
+        .setValue("in_p_radius", 16);
 
-	// Temporary input buffers
-	cl::Image2D inputImage = cl::Image2D(
-		cs.getContext(), CL_MEM_READ_WRITE,
-		cl::ImageFormat(CL_R, CL_FLOAT), 2, 2);
+    // 3 layers using chunk encoders
+    for (int l = 0; l < 3; l++)
+        arch.addHigherLayer(ogmaneo::Vec2i(36, 36), ogmaneo::_chunk)
+        .setValue("sfc_chunkSize", ogmaneo::Vec2i(6, 6))
+        .setValue("sfc_ff_radius", 12)
+        .setValue("hl_poolSteps", 2)
+        .setValue("sfc_weightAlpha", 0.02f)
+        .setValue("sfc_biasAlpha", 0.001f)
+        .setValue("p_alpha", 0.08f)
+        .setValue("p_beta", 0.16f)
+        .setValue("p_radius", 12);
 
-	cl::Image2D inputImageCorrupted = cl::Image2D(
-		cs.getContext(), CL_MEM_READ_WRITE,
-		cl::ImageFormat(CL_R, CL_FLOAT), 2, 2);
+    // Generate the hierarchy
+    std::shared_ptr<ogmaneo::Hierarchy> hierarchy = arch.generateHierarchy();
 
-	// Layer descriptors for hierarchy
-	std::vector<FeatureHierarchy::LayerDesc> layerDescs(3);
-	std::vector<Predictor::PredLayerDesc> pLayerDescs(3);
-
-	// Alter layer descriptors
-	layerDescs[0]._size = { 64, 64 };
-	layerDescs[1]._size = { 64, 64 };
-	layerDescs[2]._size = { 64, 64 };
-
-	Predictor ph;
-
-	// 2x2 input field
-	ph.createRandom(cs, prog, { 2, 2 }, pLayerDescs, layerDescs, { -0.01f, 0.01f }, 0.0f, generator);
+    // Input and prediction fields (4x4 size)
+    ogmaneo::ValueField2D inputField(ogmaneo::Vec2i(4, 4));
+    ogmaneo::ValueField2D predField(ogmaneo::Vec2i(4, 4));
 ```
 
 You can then step the simulation with:
 
 ```cpp
-	cl::array<cl::size_type, 3> origin = { 0, 0, 0 };
-	cl::array<cl::size_type, 3> region = { 2, 2, 1 };
-	
-	// Copy values into the temporary OpenCL image buffer
-	cs.getQueue().enqueueWriteImage(inputImage, CL_TRUE, origin,region, 0,0, values.data());
-
-	// Copy corrupted values into the temporary OpenCL image buffer
-	cs.getQueue().enqueueWriteImage(inputImageCorrupted, CL_TRUE, origin,region, 0,0, valuesCorrupted.data());
-
-	// Step the simulation
-	ph.simStep(cs, inputImage, inputImageCorrupted, generator, true);
+    // Fill the inputField and step the simulation
+    hierarchy->simStep(std::vector<ogmaneo::ValueField2D>{ inputField }, true);
 
 	// Retrieve the prediction (same dimensions as the input field)
-	std::vector<float> pred(4);
-	cs.getQueue().enqueueReadImage(ph.getPrediction(), CL_TRUE, origin,region, 0,0, pred.data());
+    predField = hierarchy->getPredictions().front();
 ```
 
 ## Parameters
 
-The two main classes (Predictor and AgentSwarm) have several adjustable parameters. Below is a brief description of each as it appears in the simplified interface (LayerDescs.h).
+The OgmaNeo Architect interface has several adjustable parameters.
 
-- LayerDescs
+Parameters are adjusted by performing value changes on the parameter modifier returned by layer add calls.
 
-	- width, height: (int) size of layer
-	
-	Feature hierarchy parameters
+```cpp
+    // 1 input layer
+    arch.addInputLayer(ogmaneo::Vec2i(4, 4))
+        .setValue("in_p_alpha", 0.02f)
+        .setValue("in_p_radius", 16);
 
-	- feedForwardRadius: (int) radius of nodes onto the inputs
-	- recurrentRadius: (int) radius onto previous timestep layer states
-	- inhibitionRadius: (int) radius across a layer (inhibition)
-	- spFeedForwardWeightAlpha: (float) learning rate of feed forward weights
-	- spRecurrentWeightAlpha: (float) learning rate of recurrent weights
-	- spBiasAlpha: (float) learning rate of biases
-	- spActiveRatio: (float) ratio of active units within a layer (< 0.5 = sparse, 0.5 = dense)
+    // 3 layers using chunk encoders
+    for (int l = 0; l < 3; l++)
+        arch.addHigherLayer(ogmaneo::Vec2i(36, 36), ogmaneo::_chunk)
+        .setValue("sfc_chunkSize", ogmaneo::Vec2i(6, 6))
+        .setValue("sfc_ff_radius", 12)
+        .setValue("hl_poolSteps", 2)
+        .setValue("sfc_weightAlpha", 0.02f)
+        .setValue("sfc_biasAlpha", 0.001f)
+        .setValue("p_alpha", 0.08f)
+        .setValue("p_beta", 0.16f)
+        .setValue("p_radius", 12);
+```
 
-	Predictor layer parameters
+Parameters are grouped by (possibly several) prefixes. Below is a list of parameters:
 
-	- predRadius: (int) radius onto current and higher layers for prediction
-	- predAlpha: (float) learning rate of current layer predictive weights
-	- predBeta: (float) learning rate of higher layer predictive weights
-	
-	Agent layer parameters
+Global (additional parameters, prefix 'ad'):
+ - ad_initWeightRange (float, float): global weight initialization range, used when no other ranges are available.
+ 
+Hierarchy layers (prefix 'hl'):
+ - hl_poolSteps (int): Number of steps to perform temporal pooling over, 1 means no pooling.
 
-	- qRadius: (int) radius onto previous agent layers (modulated by the feature hierarchy)
-	- qAlpha: (float) learning rate of Q values
-	- qGamma: (float) discount factor of Q values
-	- qLambda: (float) trace decay of Q values (1 = no decay, 0 = instant decay)
-	- epsilon: (float) exploration ratio (0 = no exploration, 1 = only exploration)
+Predictor (prefix 'p'):
+ - p_alpha (float): Learning rate.
+ - p_radius (int): Input field radius (onto hidden layers).
+
+Input layers (prefix 'in'):
+ - Prediction (readout) layers (prefix 'p'):
+    - in_p_alpha (float): Learning rate.
+    - in_p_radius (int): Input field radius (onto first hidden layer).
+
+Agent layers (prefix 'a'):
+ - a_radius (int): Input field radius (onto previous action layer).
+ - a_qAlpha (float): Q learning rate.
+ - a_actionAlpha (float): Action learning rate.
+ - a_qGamma (float): Q gamma (discount factor).
+ - a_qLambda (float): Q lambda (trace decay factor).
+ - a_actionLambda (float): Action lambda (trace decay factor).
+
+### Encoders
+
+Sparse features STDP (prefix 'sfs'):
+ - sfs_inhibitionRadius (int): Inhibitory (lateral) radius.
+ - sfs_initWeightRange (float, float): Weight initialization range.
+ - sfs_biasAlpha (float): Bias learning rate.
+ - sfs_activeRatio (float): Ratio of active units (inverse of sparsity).
+ - sfs_gamma (float): State trace decay (used for temporal sparsity management).
+ - Feed forward inputs (prefix 'ff'):
+    - sfs_ff_radius (int): Radius onto feed forward inputs.
+    - sfs_ff_weightAlpha (float): Learning rate for feed forward inputs.
+    - sfs_ff_lambda (float): Input trace decay for feed forward inputs.  
+ - Recurrent inputs (prefix 'r'):
+    - sfs_r_radius (int): Radius onto feed recurrent inputs.
+    - sfs_r_weightAlpha (float): Learning rate for recurrent inputs.
+    - sfs_r_lambda (float): Input trace decay for recurrent inputs.
+
+Sparse features Delay (prefix 'sfd'):
+ - sfd_inhibitionRadius (int): Inhibitory (lateral) radius.
+ - sfd_initWeightRange (float, float): Weight initialization range.
+ - sfd_biasAlpha (float): Bias learning rate.
+ - sfd_activeRatio (float): Ratio of active units (inverse of sparsity).
+ - Feed forward inputs (prefix 'ff'):
+    - sfd_ff_radius (int): Radius onto feed forward inputs.
+    - sfd_ff_weightAlpha (float): Learning rate for feed forward inputs.
+    - sfd_ff_lambda (float): Fast synaptic decay for feed forward inputs.
+    - sfd_ff_gamma (float): Long synaptic decay for feed forward inputs.
+
+Sparse features Chunk (prefix 'sfc'):
+ - sfc_chunkSize (int, int): Size of a chunk.
+ - sfc_initWeightRange (float, float): Weight initialization range.
+ - sfc_numSamples (int): Number of temporally extended samples (1 means no additional samples).
+ - sfc_biasAlpha (float): Bias learning rate.
+ - sfc_activeRatio (float): Ratio of active units (inverse of sparsity).
+ - sfc_gamma (float): Falloff (higher means faster) for SOM neighborhood radius.
+ - Feed forward inputs (prefix 'ff'):
+    - sfc_ff_radius (int): Radius onto feed forward inputs.
+    - sfc_ff_weightAlpha (float): Learning rate for feed forward inputs.
+    - sfc_ff_lambda (float): Input trace decay for feed forward inputs.  
+ - Recurrent inputs (prefix 'r'):
+    - sfc_r_radius (int): Radius onto recurrent inputs.
+    - sfc_r_weightAlpha (float): Learning rate for recurrent inputs.
+    - sfc_r_lambda (float): Input trace decay for recurrent inputs. 
 
 ## Requirements
 
 OgmaNeo requires: a C++1x compiler, [CMake](https://cmake.org/), the [FlatBuffers](https://google.github.io/flatbuffers/) package (version 1.4.0), an OpenCL 1.2 SDK, and the Khronos Group cl2.hpp file.
 
 The library has been tested extensively on:
-- Windows using Microsoft Visual Studio 2013 and 2015,
-- Linux using GCC 4.8 and upwards,
-- Mac OSX using Clang, and
-- Raspberry Pi3, using Raspbian Jessie with GCC 4.8
+ - Windows using Microsoft Visual Studio 2013 and 2015,
+ - Linux using GCC 4.8 and upwards,
+ - Mac OSX using Clang, and
+ - Raspberry Pi3, using Raspbian Jessie with GCC 4.8
 
 ### CMake
 
@@ -145,7 +197,7 @@ The open source POCL package ([Portable Computing Language](http://portablecl.or
 
 The Khronos Group [cl2.hpp](http://github.khronos.org/OpenCL-CLHPP/) header file is required when building OgmaNeo. And needs to be placed alongside your OpenCL header files. It can be downloaded from Github https://github.com/KhronosGroup/OpenCL-CLHPP/releases
 
-On Apple Mac OSX, if the `cl2.hpp` file cannot be found the `CMakeLists.txt` script will download the file and include it within library build process. On all other supported platforms the file requires a manual download and copy to the appropriate location (e.g. directory `/usr/include/CL`).
+If the `cl2.hpp` file cannot be found the `CMakeLists.txt` script will download the file and include it within library build process. On all other supported platforms the file requires a manual download and copy to the appropriate location (e.g. directory `/usr/include/CL`).
 
 ### Flatbuffers
 
@@ -170,7 +222,7 @@ The `BUILD_SHARED_LIBS` boolean cmake option can be used to create dynamic/share
 
 `make install` can be run to install the library. `make uninstall` can be used to uninstall the library.
 
-On Windows it is recommended to use `cmake-gui` to define which generator to use and specify build options.
+On Windows it is recommended to use `cmake-gui` to define which generator to use and specify optional build parameters.
 
 ## Contributions
 

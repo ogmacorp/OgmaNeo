@@ -8,157 +8,79 @@
 
 #pragma once
 
-#include "OgmaNeo.h"
+#include "system/SharedLib.h"
+#include "Helpers.h"
 #include "schemas/SparseFeatures_generated.h"
 
 namespace ogmaneo {
     /*!
-    \brief Sparse predictor
-    Learns a sparse code that is then used to predict the next input. Can be used with multiple layers
+    \brief Sparse Features
+    Base class for encoders (sparse features)
     */
     class OGMA_API SparseFeatures {
     public:
+        enum OGMA_API InputType {
+            _feedForward, _feedForwardRecurrent
+        };
+
+        SparseFeaturesType _type;
+
+    public:
         /*!
-        \brief Visible layer desc
+        \brief Sparse Features Descriptor
+        Base class for encoder descriptors (sparse features descriptors)
         */
-        struct VisibleLayerDesc {
-            /*!
-            \brief Size of layer
-            */
-            cl_int2 _size;
+        class OGMA_API SparseFeaturesDesc {
+        public:
+            std::string _name;
 
-            /*!
-            \brief Radius onto input
-            */
-            cl_int _radius;
+            InputType _inputType;
 
-            /*!
-            \brief Whether or not the middle (center) input should be ignored (self in recurrent schemes)
-            */
-            unsigned char _ignoreMiddle;
+            virtual size_t getNumVisibleLayers() const = 0;
+            virtual cl_int2 getVisibleLayerSize(int vli) const = 0;
 
-            /*!
-            \brief Learning rate
-            */
-            cl_float _weightAlpha;
+            virtual cl_int2 getHiddenSize() const = 0;
+
+            virtual std::shared_ptr<SparseFeatures> sparseFeaturesFactory() = 0;
 
             /*!
             \brief Initialize defaults
             */
-            VisibleLayerDesc()
-                : _size({ 8, 8 }), _radius(6), _ignoreMiddle(false),
-                _weightAlpha(0.004f)
+            SparseFeaturesDesc()
+                : _name("Unassigned"), _inputType(_feedForward)
             {}
 
-            //!@{
-            /*!
-            \brief Serialization
-            */
-            void load(const schemas::hierarchy::VisibleLayerDesc* fbVisibleLayerDesc, ComputeSystem &cs);
-            schemas::hierarchy::VisibleLayerDesc save(flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs);
-            //!@}
-        };
-
-        /*!
-        \brief Visible layer
-        */
-        struct VisibleLayer {
-            /*!
-            \brief Possibly manipulated input
-            */
-            DoubleBuffer2D _derivedInput;
-
-            //!@{
-            /*!
-            \brief Weights
-            */
-            DoubleBuffer3D _weights; // Encoding weights (creates spatio-temporal sparse code)
-            //!@}
-
-            //!@{
-            /*!
-            \brief Transformations
-            */
-            cl_float2 _hiddenToVisible;
-            cl_float2 _visibleToHidden;
-
-            cl_int2 _reverseRadii;
-            //!@}
+            virtual ~SparseFeaturesDesc() {}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::hierarchy::VisibleLayer* fbVisibleLayer, ComputeSystem &cs);
-            flatbuffers::Offset<schemas::hierarchy::VisibleLayer> save(flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs);
+            void load(const schemas::SparseFeaturesDesc* fbSparseFeaturesDesc, ComputeSystem &cs) {
+                _name = fbSparseFeaturesDesc->_name()->c_str();
+
+                switch (fbSparseFeaturesDesc->_inputType()) {
+                default:
+                case schemas::InputType::InputType__feedForward:            _inputType = InputType::_feedForward; break;
+                case schemas::InputType::InputType__feedForwardRecurrent:   _inputType = InputType::_feedForwardRecurrent; break;
+                }
+            }
+
+            flatbuffers::Offset<schemas::SparseFeaturesDesc> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
+                schemas::InputType inputType;
+                switch (_inputType) {
+                default:
+                case InputType::_feedForward:           inputType = schemas::InputType::InputType__feedForward; break;
+                case InputType::_feedForwardRecurrent:  inputType = schemas::InputType::InputType__feedForwardRecurrent; break;
+                }
+
+                return schemas::CreateSparseFeaturesDesc(builder,
+                    builder.CreateString(_name), inputType);
+            }
             //!@}
         };
 
-    private:
-        //!@{
-        /*!
-        \brief Hidden activations, states, biases, errors, predictions
-        */
-        DoubleBuffer2D _hiddenActivations;
-        DoubleBuffer2D _hiddenStates;
-        DoubleBuffer2D _hiddenBiases;
-        //!@}
-
-        /*!
-        \brief Hidden size
-        */
-        cl_int2 _hiddenSize;
-
-        /*!
-        \brief Lateral inhibitory radius
-        */
-        cl_int _inhibitionRadius;
-
-        /*!
-        \brief Hidden summation temporary buffer
-        */
-        DoubleBuffer2D _hiddenSummationTemp;
-
-        //!@{
-        /*!
-        \brief Layers and descs
-        */
-        std::vector<VisibleLayerDesc> _visibleLayerDescs;
-        std::vector<VisibleLayer> _visibleLayers;
-        //!@}
-
-        //!@{
-        /*!
-        \brief Kernels
-        */
-        cl::Kernel _stimulusKernel;
-        cl::Kernel _activateKernel;
-        cl::Kernel _inhibitKernel;
-        cl::Kernel _learnWeightsKernel;
-        cl::Kernel _learnBiasesKernel;
-        cl::Kernel _deriveInputsKernel;
-        //!@}
-
-    public:
-        /*!
-        \brief Create a comparison sparse coder with random initialization.
-        Requires the ComputeSystem, ComputeProgram with the OgmaNeo kernels, and initialization information.
-        \param cs is the ComputeSystem.
-        \param program is the ComputeProgram associated with the ComputeSystem and loaded with the main kernel code.
-        \param cs is the ComputeSystem.
-        \param program is the ComputeProgram associated with the ComputeSystem and loaded with the main kernel code.
-        \param visibleLayerDescs descriptors for each input layer.
-        \param hiddenSize hidden layer (SDR) size (2D).
-        \param inhibitionRadius inhibitory radius.
-        \param initWeightRange are the minimum and maximum range values for weight initialization.
-        \param rng a random number generator.
-        */
-        void createRandom(ComputeSystem &cs, ComputeProgram &program,
-            const std::vector<VisibleLayerDesc> &visibleLayerDescs,
-            cl_int2 hiddenSize,
-            cl_int inhibitionRadius,
-            cl_float2 initWeightRange,
-            std::mt19937 &rng);
+        virtual ~SparseFeatures() {}
 
         /*!
         \brief Activate predictor
@@ -168,76 +90,51 @@ namespace ogmaneo {
         \param activeRatio % active units.
         \param rng a random number generator.
         */
-        void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, float activeRatio, std::mt19937 &rng);
+        virtual void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, const cl::Image2D &predictionsPrev, std::mt19937 &rng) = 0;
 
         /*!
         \brief End a simulation step
         */
-        void stepEnd(ComputeSystem &cs);
+        virtual void stepEnd(ComputeSystem &cs) = 0;
 
         /*!
         \brief Learning
-        \param cs is the ComputeSystem.
-        \param biasAlpha learning rate of bias.
-        \param activeRatio % active units.
-        \param gamma synaptic trace decay.
         */
-        void learn(ComputeSystem &cs, float biasAlpha, float activeRatio);
+        virtual void learn(ComputeSystem &cs, std::mt19937 &rng) = 0;
 
         /*!
-        \brief Get number of visible layers
+        \brief Inhibition
         */
-        size_t getNumVisibleLayers() const {
-            return _visibleLayers.size();
-        }
-
-        /*!
-        \brief Get access to visible layer
-        */
-        const VisibleLayer &getVisibleLayer(int index) const {
-            return _visibleLayers[index];
-        }
-
-        /*!
-        \brief Get access to visible layer
-        */
-        const VisibleLayerDesc &getVisibleLayerDesc(int index) const {
-            return _visibleLayerDescs[index];
-        }
+        virtual void inhibit(ComputeSystem &cs, const cl::Image2D &activations, cl::Image2D &states, std::mt19937 &rng) = 0;
 
         /*!
         \brief Get hidden size
         */
-        cl_int2 getHiddenSize() const {
-            return _hiddenSize;
-        }
+        virtual cl_int2 getHiddenSize() const = 0;
 
         /*!
         \brief Get hidden states
         */
-        const DoubleBuffer2D &getHiddenStates() const {
-            return _hiddenStates;
-        }
+        virtual const DoubleBuffer2D &getHiddenStates() const = 0;
 
         /*!
-        \brief Get hidden biases
+        \brief Get context
         */
-        const DoubleBuffer2D &getHiddenBiases() const {
-            return _hiddenBiases;
+        virtual const cl::Image2D &getHiddenContext() const {
+            return getHiddenStates()[_back];
         }
 
         /*!
         \brief Clear the working memory
         */
-        void clearMemory(ComputeSystem &cs);
+        virtual void clearMemory(ComputeSystem &cs) = 0;
 
         //!@{
         /*!
         \brief Serialization
         */
-        void load(const schemas::hierarchy::SparseFeatures* fbSF, ComputeSystem &cs);
-        flatbuffers::Offset<schemas::hierarchy::SparseFeatures> save(flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs);
+        virtual void load(const schemas::SparseFeatures* fbSparseFeatures, ComputeSystem &cs) = 0;
+        virtual flatbuffers::Offset<schemas::SparseFeatures> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) = 0;
         //!@}
     };
-
 }

@@ -135,15 +135,15 @@ void ogmaneo::load(cl::Image2D &img, const schemas::Image2D* fbImg, ComputeSyste
     assert(height == fbImg->height());
     assert(elementSize == fbImg->elementSize());
 
-    //	schemas::PixelData pixelType = fbImg->pixels_type();
-    //	switch (fbImg->pixels_type())
-    //	{
-    //	case schemas::PixelData::PixelData_FloatArray:
+    schemas::PixelData pixelType = fbImg->pixels_type();
+    switch (fbImg->pixels_type())
+    {
+    case schemas::PixelData::PixelData_FloatArray:
     {
         const schemas::FloatArray* fbFloatArray =
             reinterpret_cast<const schemas::FloatArray*>(fbImg->pixels());
 
-        uint32_t numElements = width * height * (elementSize / 4);
+        uint32_t numElements = width * height * (elementSize / sizeof(float));
         std::vector<float> floatArray(numElements, 0.0f);
 
         for (uint32_t i = 0; i < numElements; i++)
@@ -151,14 +151,27 @@ void ogmaneo::load(cl::Image2D &img, const schemas::Image2D* fbImg, ComputeSyste
 
         cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, 1 }, 0, 0, floatArray.data());
         cs.getQueue().finish();
+        break;
     }
-    /*	break;
+    case schemas::PixelData::PixelData_ByteArray:
+    {
+        const schemas::ByteArray* fbByteArray =
+            reinterpret_cast<const schemas::ByteArray*>(fbImg->pixels());
 
-        default:
-            assert(0);
-            break;
-        }
-    */
+        uint32_t numElements = width * height * (elementSize / sizeof(unsigned char));
+        std::vector<unsigned char> byteArray(numElements, 0);
+
+        for (uint32_t i = 0; i < numElements; i++)
+            byteArray[i] = fbByteArray->data()->Get(i);
+
+        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, 1 }, 0, 0, byteArray.data());
+        cs.getQueue().finish();
+        break;
+    }
+    default:
+        assert(0);
+        break;
+    }
 }
 
 void ogmaneo::load(cl::Image3D &img, const schemas::Image3D* fbImg, ComputeSystem &cs) {
@@ -172,15 +185,15 @@ void ogmaneo::load(cl::Image3D &img, const schemas::Image3D* fbImg, ComputeSyste
     assert(depth == fbImg->depth());
     assert(elementSize == fbImg->elementSize());
 
-    //	schemas::PixelData pixelType = fbImg->pixels_type();
-    //	switch (fbImg->pixels_type())
-    //	{
-    //	case schemas::PixelData::PixelData_FloatArray:
+    schemas::PixelData pixelType = fbImg->pixels_type();
+    switch (fbImg->pixels_type())
+    {
+    case schemas::PixelData::PixelData_FloatArray:
     {
         const schemas::FloatArray* fbFloatArray =
             reinterpret_cast<const schemas::FloatArray*>(fbImg->pixels());
 
-        uint32_t numElements = width * height * depth * (elementSize / 4);
+        uint32_t numElements = width * height * depth * (elementSize / sizeof(float));
         std::vector<float> floatArray(numElements, 0.0f);
 
         for (uint32_t i = 0; i < numElements; i++)
@@ -188,14 +201,27 @@ void ogmaneo::load(cl::Image3D &img, const schemas::Image3D* fbImg, ComputeSyste
 
         cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, depth }, 0, 0, floatArray.data());
         cs.getQueue().finish();
+        break;
     }
-    /*	break;
+    case schemas::PixelData::PixelData_ByteArray:
+    {
+        const schemas::ByteArray* fbByteArray =
+            reinterpret_cast<const schemas::ByteArray*>(fbImg->pixels());
 
-        default:
-            assert(0);
-            break;
-        }
-    */
+        uint32_t numElements = width * height * depth * (elementSize / sizeof(unsigned char));
+        std::vector<unsigned char> byteArray(numElements, 0);
+
+        for (uint32_t i = 0; i < numElements; i++)
+            byteArray[i] = fbByteArray->data()->Get(i);
+
+        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, depth }, 0, 0, byteArray.data());
+        cs.getQueue().finish();
+        break;
+    }
+    default:
+        assert(0);
+        break;
+    }
 }
 
 flatbuffers::Offset<schemas::Image2D> ogmaneo::save(cl::Image2D &img, flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs) {
@@ -211,23 +237,33 @@ flatbuffers::Offset<schemas::Image2D> ogmaneo::save(cl::Image2D &img, flatbuffer
         static_cast<schemas::ChannelDataType>(channelType)
     );
 
-    flatbuffers::Offset<schemas::Image2D> ret = NULL;
+    flatbuffers::Offset<schemas::Image2D> ret;
 
     switch (channelType) {
     case CL_FLOAT:
     {
-        std::vector<float> pixels(width * height * (elementSize / 4), 0.0f);
+        std::vector<float> pixels(width * height * (elementSize / sizeof(float)), 0.0f);
         cs.getQueue().enqueueReadImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, 1 }, 0, 0, pixels.data());
         cs.getQueue().finish();
 
         flatbuffers::Offset<flatbuffers::Vector<float>> floatVector = builder.CreateVector(pixels.data(), pixels.size());
         flatbuffers::Offset<schemas::FloatArray> floatArray = schemas::CreateFloatArray(builder, floatVector);
         ret = schemas::CreateImage2D(builder,
-            &format, width, height, elementSize, floatArray);
-        //			schemas::PixelData_FloatArray, floatArray.Union());
+            &format, width, height, elementSize, schemas::PixelData_FloatArray, floatArray.Union());
         break;
     }
+    case CL_SIGNED_INT8:
+    {
+        std::vector<unsigned char> pixels(width * height * (elementSize / sizeof(unsigned char)), 0);
+        cs.getQueue().enqueueReadImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, 1 }, 0, 0, pixels.data());
+        cs.getQueue().finish();
 
+        flatbuffers::Offset<flatbuffers::Vector<unsigned char>> byteVector = builder.CreateVector(pixels.data(), pixels.size());
+        flatbuffers::Offset<schemas::ByteArray> byteArray = schemas::CreateByteArray(builder, byteVector);
+        ret = schemas::CreateImage2D(builder,
+            &format, width, height, elementSize, schemas::PixelData_ByteArray, byteArray.Union());
+        break;
+    }
     default:
         assert(0);
         break;
@@ -250,20 +286,31 @@ flatbuffers::Offset<schemas::Image3D> ogmaneo::save(cl::Image3D &img, flatbuffer
         static_cast<schemas::ChannelDataType>(channelType)
     );
 
-    flatbuffers::Offset<schemas::Image3D> ret = NULL;
+    flatbuffers::Offset<schemas::Image3D> ret;
 
     switch (channelType) {
     case CL_FLOAT:
     {
-        std::vector<float> pixels(width * height * depth * (elementSize / 4), 0.0f);
+        std::vector<float> pixels(width * height * depth * (elementSize / sizeof(float)), 0.0f);
         cs.getQueue().enqueueReadImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, depth }, 0, 0, pixels.data());
         cs.getQueue().finish();
 
         flatbuffers::Offset<flatbuffers::Vector<float>> floatVector = builder.CreateVector(pixels.data(), pixels.size());
         flatbuffers::Offset<schemas::FloatArray> floatArray = schemas::CreateFloatArray(builder, floatVector);
         ret = schemas::CreateImage3D(builder,
-            &format, width, height, depth, elementSize, floatArray);
-        //			schemas::PixelData_FloatArray, floatArray.Union());
+            &format, width, height, depth, elementSize, schemas::PixelData_FloatArray, floatArray.Union());
+        break;
+    }
+    case CL_SIGNED_INT8:
+    {
+        std::vector<unsigned char> pixels(width * height * depth * (elementSize / sizeof(unsigned char)), 0);
+        cs.getQueue().enqueueReadImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, depth }, 0, 0, pixels.data());
+        cs.getQueue().finish();
+
+        flatbuffers::Offset<flatbuffers::Vector<unsigned char>> byteVector = builder.CreateVector(pixels.data(), pixels.size());
+        flatbuffers::Offset<schemas::ByteArray> byteArray = schemas::CreateByteArray(builder, byteVector);
+        ret = schemas::CreateImage3D(builder,
+            &format, width, height, depth, elementSize, schemas::PixelData_ByteArray, byteArray.Union());
         break;
     }
     default:

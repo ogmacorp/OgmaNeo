@@ -7,198 +7,184 @@
 // ----------------------------------------------------------------------------
 
 #include "FeatureHierarchy.h"
+#include "SparseFeaturesChunk.h"
+#include "SparseFeaturesDelay.h"
+#include "SparseFeaturesSTDP.h"
 
 using namespace ogmaneo;
 
-void FeatureHierarchy::createRandom(ComputeSystem &cs, ComputeProgram &program,
-    const std::vector<InputDesc> &inputDescs, const std::vector<LayerDesc> &layerDescs,
-    cl_float2 initWeightRange,
+void FeatureHierarchy::createRandom(ComputeSystem &cs, ComputeProgram &fhProgram,
+    const std::vector<LayerDesc> &layerDescs,
     std::mt19937 &rng)
 {
     _layerDescs = layerDescs;
 
-    _layerDescs.front()._inputDescs = inputDescs;
-
     _layers.resize(_layerDescs.size());
 
-    cl_int2 prevLayerSize = inputDescs.front()._size;
-
     for (int l = 0; l < _layers.size(); l++) {
-        if (l == 0) {
-            std::vector<SparseFeatures::VisibleLayerDesc> spDescs(inputDescs.size());
+        _layers[l]._sf = _layerDescs[l]._sfDesc->sparseFeaturesFactory();
 
-            for (int i = 0; i < inputDescs.size(); i++) {
-                // Feed forward
-                spDescs[i]._size = inputDescs[i]._size;
-                spDescs[i]._radius = inputDescs[i]._radius;
-                spDescs[i]._ignoreMiddle = false;
-                spDescs[i]._weightAlpha = _layerDescs[l]._spFeedForwardWeightAlpha;
-            }
+        // Create temporal pooling buffer
+        _layers[l]._tpBuffer = createDoubleBuffer2D(cs, _layers[l]._sf->getHiddenSize(), CL_R, CL_FLOAT);
 
-            // Recurrent     
-            if (_layerDescs[l]._recurrentRadius != 0) {
-                SparseFeatures::VisibleLayerDesc recDesc;
-
-                recDesc._size = _layerDescs[l]._size;
-                recDesc._radius = _layerDescs[l]._recurrentRadius;
-                recDesc._ignoreMiddle = true;
-                recDesc._weightAlpha = _layerDescs[l]._spRecurrentWeightAlpha;
-
-                spDescs.push_back(recDesc);
-            }
-
-            _layers[l]._sp.createRandom(cs, program, spDescs, _layerDescs[l]._size, _layerDescs[l]._inhibitionRadius, initWeightRange, rng);
-        }
-        else {
-            std::vector<SparseFeatures::VisibleLayerDesc> spDescs(_layerDescs[l]._recurrentRadius != 0 ? 2 : 1);
-
-            // Feed forward
-            spDescs[0]._size = prevLayerSize;
-            spDescs[0]._radius = _layerDescs[l]._inputDescs.front()._radius;
-            spDescs[0]._ignoreMiddle = false;
-            spDescs[0]._weightAlpha = _layerDescs[l]._spFeedForwardWeightAlpha;
-
-            // Recurrent     
-            if (_layerDescs[l]._recurrentRadius != 0) {
-                spDescs[1]._size = _layerDescs[l]._size;
-                spDescs[1]._radius = _layerDescs[l]._recurrentRadius;
-                spDescs[1]._ignoreMiddle = true;
-                spDescs[1]._weightAlpha = _layerDescs[l]._spRecurrentWeightAlpha;
-            }
-
-            _layers[l]._sp.createRandom(cs, program, spDescs, _layerDescs[l]._size, _layerDescs[l]._inhibitionRadius, initWeightRange, rng);
-        }
-
-        // Next layer
-        prevLayerSize = _layerDescs[l]._size;
+        // Prediction error
+        _layers[l]._predErrors = cl::Image2D(cs.getContext(), CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), _layers[l]._sf->getHiddenSize().x, _layers[l]._sf->getHiddenSize().y);
     }
+
+    // Kernels
+    _fhPoolKernel = cl::Kernel(fhProgram.getProgram(), "fhPool");
+    _fhPredErrorKernel = cl::Kernel(fhProgram.getProgram(), "fhPredError");
 }
 
-void FeatureHierarchy::simStep(ComputeSystem &cs, const std::vector<cl::Image2D> &inputs, std::mt19937 &rng, bool learn) {
-    std::vector<cl::Image2D> inputsUse = inputs;
-
-    if (_layerDescs.front()._recurrentRadius != 0)
-        inputsUse.push_back(_layers.front()._sp.getHiddenStates()[_back]);
-
-    // Activate
+void FeatureHierarchy::simStep(ComputeSystem &cs, const std::vector<cl::Image2D> &inputs, const std::vector<cl::Image2D> &predictionsPrev, std::mt19937 &rng, bool learn) {
+    // Clear summation buffers if reset previously
     for (int l = 0; l < _layers.size(); l++) {
-        std::vector<cl::Image2D> visibleStates = (l == 0) ? inputsUse : (_layerDescs[l]._recurrentRadius != 0 ? std::vector<cl::Image2D>{ _layers[l - 1]._sp.getHiddenStates()[_front], _layers[l]._sp.getHiddenStates()[_back] } : std::vector<cl::Image2D>{ _layers[l - 1]._sp.getHiddenStates()[_front] });
-
-        _layers[l]._sp.activate(cs, visibleStates, _layerDescs[l]._spActiveRatio, rng);
+        if (_layers[l]._tpNextReset)
+            // Clear summation buffer
+            cs.getQueue().enqueueFillImage(_layers[l]._tpBuffer[_back], cl_float4{ 0.0f, 0.0f, 0.0f, 0.0f }, { 0, 0, 0 }, { static_cast<cl::size_type>(_layers[l]._sf->getHiddenSize().x), static_cast<cl::size_type>(_layers[l]._sf->getHiddenSize().y), 1 });
     }
 
-    // Learn
-    for (int l = 0; l < _layers.size(); l++)
-        _layers[l]._sp.learn(cs, _layerDescs[l]._spBiasAlpha, _layerDescs[l]._spActiveRatio);
+    // Activate
+    bool prevClockReset = true;
 
-    // Step end
-    for (int l = 0; l < _layers.size(); l++)
-        _layers[l]._sp.stepEnd(cs);
+    for (int l = 0; l < _layers.size(); l++) {
+        // Add input to pool
+        if (prevClockReset) {
+            _layers[l]._clock++;
+
+            // Gather inputs for layer
+            std::vector<cl::Image2D> visibleStates;
+
+            if (l == 0) {
+                std::vector<cl::Image2D> inputsUse = inputs;
+
+                if (_layerDescs.front()._sfDesc->_inputType == SparseFeatures::_feedForwardRecurrent)
+                    inputsUse.push_back(_layers.front()._sf->getHiddenContext());
+
+                visibleStates = inputsUse;
+            }
+            else
+                visibleStates = _layerDescs[l]._sfDesc->_inputType == SparseFeatures::_feedForwardRecurrent ? std::vector<cl::Image2D>{ _layers[l - 1]._tpBuffer[_back], _layers[l]._sf->getHiddenContext() } : std::vector<cl::Image2D>{ _layers[l - 1]._tpBuffer[_back] };
+
+            // Update layer
+            _layers[l]._sf->activate(cs, visibleStates, predictionsPrev[l], rng);
+
+            if (learn)
+                _layers[l]._sf->learn(cs, rng);
+
+            _layers[l]._sf->stepEnd(cs);
+
+            // Prediction error
+            {
+                int argIndex = 0;
+
+                _fhPredErrorKernel.setArg(argIndex++, _layers[l]._sf->getHiddenStates()[_back]);
+                _fhPredErrorKernel.setArg(argIndex++, predictionsPrev[l]);
+                _fhPredErrorKernel.setArg(argIndex++, _layers[l]._predErrors);
+
+                cs.getQueue().enqueueNDRangeKernel(_fhPredErrorKernel, cl::NullRange, cl::NDRange(_layers[l]._sf->getHiddenSize().x, _layers[l]._sf->getHiddenSize().y));
+            }
+
+            // Add state to average
+            {
+                int argIndex = 0;
+
+                _fhPoolKernel.setArg(argIndex++, _layers[l]._predErrors);
+                _fhPoolKernel.setArg(argIndex++, _layers[l]._tpBuffer[_back]);
+                _fhPoolKernel.setArg(argIndex++, _layers[l]._tpBuffer[_front]);
+                _fhPoolKernel.setArg(argIndex++, 1.0f / std::max(1, _layerDescs[l]._poolSteps));
+
+                cs.getQueue().enqueueNDRangeKernel(_fhPoolKernel, cl::NullRange, cl::NDRange(_layers[l]._sf->getHiddenSize().x, _layers[l]._sf->getHiddenSize().y));
+
+                std::swap(_layers[l]._tpBuffer[_front], _layers[l]._tpBuffer[_back]);
+            }
+        }
+
+        _layers[l]._tpReset = prevClockReset;
+
+        if (_layers[l]._clock >= _layerDescs[l]._poolSteps) {
+            _layers[l]._clock = 0;
+
+            prevClockReset = true;
+        }
+        else
+            prevClockReset = false;
+
+        _layers[l]._tpNextReset = prevClockReset;
+    }
 }
 
 void FeatureHierarchy::clearMemory(ComputeSystem &cs) {
     for (int l = 0; l < _layers.size(); l++)
-        _layers[l]._sp.clearMemory(cs);
+        _layers[l]._sf->clearMemory(cs);
 }
 
-void FeatureHierarchy::InputDesc::load(const schemas::hierarchy::InputDesc* inputDesc) {
-    _size = cl_int2{ inputDesc->_size().x(), inputDesc->_size().y() };
-    _radius = inputDesc->_radius();
+void FeatureHierarchy::LayerDesc::load(const schemas::FeatureHierarchyLayerDesc* fbFeatureHierarchyLayerDesc, ComputeSystem &cs) {
+    _sfDesc->load(fbFeatureHierarchyLayerDesc->_sfDesc(), cs);
+    _poolSteps = fbFeatureHierarchyLayerDesc->_poolSteps();
 }
 
-void FeatureHierarchy::LayerDesc::load(const schemas::hierarchy::LayerDesc* fbLayerDesc) {
-    if (!_inputDescs.empty()) {
-        assert(_inputDescs.size() == fbLayerDesc->_inputDescs()->Length());
+flatbuffers::Offset<schemas::FeatureHierarchyLayerDesc> FeatureHierarchy::LayerDesc::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
+    return schemas::CreateFeatureHierarchyLayerDesc(builder,
+        _sfDesc->save(builder, cs), _poolSteps);
+}
+
+void FeatureHierarchy::Layer::load(const schemas::FeatureHierarchyLayer* fbFeatureHierarchyLayer, ComputeSystem &cs) {
+    schemas::SparseFeatures* fbSparseFeatures =
+        (schemas::SparseFeatures*)(fbFeatureHierarchyLayer->_sf());
+    _sf->load(fbSparseFeatures, cs);
+
+    _clock = fbFeatureHierarchyLayer->_clock();
+    ogmaneo::load(_tpBuffer, fbFeatureHierarchyLayer->_tpBuffer(), cs);
+    ogmaneo::load(_predErrors, fbFeatureHierarchyLayer->_predErrors(), cs);
+    _tpReset = fbFeatureHierarchyLayer->_tpReset();
+    _tpNextReset = fbFeatureHierarchyLayer->_tpNextReset();
+}
+
+flatbuffers::Offset<schemas::FeatureHierarchyLayer> FeatureHierarchy::Layer::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
+    schemas::SparseFeaturesType type;
+    switch (_sf->_type) {
+    default:
+    case SparseFeaturesType::_chunk:    type = schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesChunk; break;
+    case SparseFeaturesType::_delay:    type = schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesDelay; break;
+    case SparseFeaturesType::_stdp:  type = schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesSTDP; break;
+    }
+    return schemas::CreateFeatureHierarchyLayer(builder,
+        type, _sf->save(builder, cs).Union(),
+        _clock,
+        ogmaneo::save(_tpBuffer, builder, cs),
+        ogmaneo::save(_predErrors, builder, cs),
+        _tpReset, _tpNextReset);
+}
+
+void FeatureHierarchy::load(const schemas::FeatureHierarchy* fbFeatureHierarchy, ComputeSystem &cs) {
+    if (!_layers.empty()) {
+        assert(_layerDescs.size() == fbFeatureHierarchy->_layerDescs()->Length());
+        assert(_layers.size() == fbFeatureHierarchy->_layers()->Length());
     }
     else {
-        _inputDescs.reserve(fbLayerDesc->_inputDescs()->Length());
+        _layerDescs.reserve(fbFeatureHierarchy->_layerDescs()->Length());
+        _layers.reserve(fbFeatureHierarchy->_layers()->Length());
     }
 
-    _size = cl_int2{ fbLayerDesc->_size()->x(), fbLayerDesc->_size()->y() };
-
-    for (flatbuffers::uoffset_t i = 0; i < fbLayerDesc->_inputDescs()->Length(); i++) {
-        _inputDescs[i].load(fbLayerDesc->_inputDescs()->Get(i));
+    for (flatbuffers::uoffset_t i = 0; i < fbFeatureHierarchy->_layerDescs()->Length(); i++) {
+        _layerDescs[i].load(fbFeatureHierarchy->_layerDescs()->Get(i), cs);
     }
 
-    _recurrentRadius = fbLayerDesc->_recurrentRadius();
-    _inhibitionRadius = fbLayerDesc->_inhibitionRadius();
-    _spFeedForwardWeightAlpha = fbLayerDesc->_spFeedForwardWeightAlpha();
-    _spRecurrentWeightAlpha = fbLayerDesc->_spRecurrentWeightAlpha();
-    _spBiasAlpha = fbLayerDesc->_spBiasAlpha();
-    _spActiveRatio = fbLayerDesc->_spActiveRatio();
-}
-
-void FeatureHierarchy::Layer::load(const schemas::hierarchy::Layer* fbLayer, ComputeSystem &cs) {
-    _sp.load(fbLayer->_sp(), cs);
-}
-
-void FeatureHierarchy::load(const schemas::hierarchy::FeatureHierarchy* fbFH, ComputeSystem &cs) {
-    // Loading into an existing FeatureHierarchy?
-    if (!_layerDescs.empty()) {
-        assert(_layerDescs.size() == fbFH->_layerDescs()->Length());
-        assert(_layers.size() == fbFH->_layers()->Length());
+    for (flatbuffers::uoffset_t i = 0; i < fbFeatureHierarchy->_layers()->Length(); i++) {
+        _layers[i].load(fbFeatureHierarchy->_layers()->Get(i), cs);
     }
-    else {
-        _layerDescs.reserve(fbFH->_layerDescs()->Length());
-        _layers.reserve(fbFH->_layers()->Length());
-    }
-
-    for (flatbuffers::uoffset_t i = 0; i < fbFH->_layerDescs()->Length(); i++) {
-        _layerDescs[i].load(fbFH->_layerDescs()->Get(i));
-    }
-
-    for (flatbuffers::uoffset_t i = 0; i < fbFH->_layers()->Length(); i++) {
-        _layers[i].load(fbFH->_layers()->Get(i), cs);
-    }
-
 }
 
-flatbuffers::Offset<schemas::hierarchy::LayerDesc> FeatureHierarchy::LayerDesc::save(flatbuffers::FlatBufferBuilder& builder) {
-    schemas::int2 size(_size.x, _size.y);
-    
-    std::vector<schemas::hierarchy::InputDesc> inputDescs;
-
-    for (InputDesc inputDesc : _inputDescs)
-        inputDescs.push_back(inputDesc.save(builder));
-
-    return schemas::hierarchy::CreateLayerDesc(builder,
-        &size, builder.CreateVectorOfStructs(inputDescs), _recurrentRadius, _inhibitionRadius,
-        _spFeedForwardWeightAlpha, _spRecurrentWeightAlpha,
-        _spBiasAlpha, _spActiveRatio
-    );
-}
-
-schemas::hierarchy::InputDesc FeatureHierarchy::InputDesc::save(flatbuffers::FlatBufferBuilder &builder) {
-    schemas::int2 size(_size.x, _size.y);
-   
-    schemas::hierarchy::InputDesc inputDesc(
-        size, _radius
-    );
-
-    return inputDesc;
-}
-
-flatbuffers::Offset<schemas::hierarchy::Layer> FeatureHierarchy::Layer::save(flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs) {
-    return schemas::hierarchy::CreateLayer(builder, _sp.save(builder, cs));
-}
-
-flatbuffers::Offset<schemas::hierarchy::FeatureHierarchy> FeatureHierarchy::save(flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs) {
-    std::vector<flatbuffers::Offset<schemas::hierarchy::LayerDesc>> layerDescs;
-
+flatbuffers::Offset<schemas::FeatureHierarchy> FeatureHierarchy::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
+    std::vector<flatbuffers::Offset<schemas::FeatureHierarchyLayerDesc>> layerDescs;
     for (LayerDesc layerDesc : _layerDescs)
-        layerDescs.push_back(layerDesc.save(builder));
+        layerDescs.push_back(layerDesc.save(builder, cs));
 
-    std::vector<flatbuffers::Offset<schemas::hierarchy::Layer>> layers;
-
+    std::vector<flatbuffers::Offset<schemas::FeatureHierarchyLayer>> layers;
     for (Layer layer : _layers)
         layers.push_back(layer.save(builder, cs));
 
-    // Build the FeatureHierarchy
-    flatbuffers::Offset<schemas::hierarchy::FeatureHierarchy> ph = schemas::hierarchy::CreateFeatureHierarchy(
-        builder,
-        builder.CreateVector(layers),
-        builder.CreateVector(layerDescs)
-    );
-
-    return ph;
+    return schemas::CreateFeatureHierarchy(builder,
+        builder.CreateVector(layerDescs), builder.CreateVector(layers));
 }

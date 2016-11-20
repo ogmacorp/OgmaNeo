@@ -8,7 +8,10 @@
 
 #pragma once
 
-#include "OgmaNeo.h"
+#include "system/SharedLib.h"
+#include "system/ComputeSystem.h"
+#include "system/ComputeProgram.h"
+#include "Helpers.h"
 #include "schemas/ImageWhitener_generated.h"
 
 namespace ogmaneo {

@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "OgmaNeo.h"
+#include "system/SharedLib.h"
 #include <vector>
 
 namespace ogmaneo {

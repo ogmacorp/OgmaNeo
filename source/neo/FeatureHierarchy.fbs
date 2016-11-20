@@ -9,29 +9,23 @@
 include "Helpers.fbs";
 include "SparseFeatures.fbs";
 
-namespace ogmaneo.schemas.hierarchy;
+namespace ogmaneo.schemas;
 
-struct InputDesc {
-	_size:int2;
-	_radius:int;
+table FeatureHierarchyLayerDesc {
+    _sfDesc:SparseFeaturesDesc;
+    _poolSteps:int;
 }
 
-table LayerDesc {
-	_size:int2;
-	_inputDescs:[InputDesc];
-	_recurrentRadius:int;
-	_inhibitionRadius:int;
-	_spFeedForwardWeightAlpha:float;
-	_spRecurrentWeightAlpha:float;
-	_spBiasAlpha:float;
-	_spActiveRatio:float;
-}
-
-table Layer {
-	_sp:SparseFeatures;
+table FeatureHierarchyLayer {
+	_sf:SparseFeaturesType;
+    _clock:int;
+    _tpBuffer:DoubleBuffer2D;
+    _predErrors:Image2D;
+    _tpReset:bool;
+    _tpNextReset:bool;
 }
 
 table FeatureHierarchy {
-	_layers:[Layer];
-	_layerDescs:[LayerDesc];
+	_layerDescs:[FeatureHierarchyLayerDesc];
+	_layers:[FeatureHierarchyLayer];
 }

@@ -32,6 +32,21 @@ struct float4 {
 	w:float;
 }
 
+struct Vec2i {
+    x:int;
+    y:int;
+}
+
+struct Vec2f {
+    x:float;
+    y:float;
+}
+
+table ValueField2D {
+    _data:[float];
+    _size:Vec2i;
+}
+
 // Matches cl_channel_order
 enum ChannelOrder:uint {
 	CL_R = 0x10B0, CL_A, CL_RG, CL_RA, CL_RGB, CL_RGBA, CL_BGRA, CL_ARGB,
@@ -61,12 +76,16 @@ table ShortArray {
 	data:[ushort];
 }
 
+table IntArray {
+	data:[uint];
+}
+
 table FloatArray {
 	data:[float];
 }
 
 union PixelData {
-	ByteArray, ShortArray, FloatArray
+	ByteArray, ShortArray, IntArray, FloatArray
 }
 
 table Image2D {
@@ -74,7 +93,7 @@ table Image2D {
 	width:uint;
 	height:uint;
 	elementSize:uint;
-	pixels:FloatArray;
+	pixels:PixelData;
 }
 
 table Image3D {
@@ -83,7 +102,7 @@ table Image3D {
 	height:uint;
 	depth:uint;
 	elementSize:uint;
-	pixels:FloatArray;
+	pixels:PixelData;
 }
 
 table DoubleBuffer2D {
