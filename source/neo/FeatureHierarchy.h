@@ -8,9 +8,8 @@
 
 #pragma once
 
-#include "OgmaNeo.h"
+#include "system/SharedLib.h"
 #include "SparseFeatures.h"
-#include "ImageWhitener.h"
 #include "schemas/FeatureHierarchy_generated.h"
 
 namespace ogmaneo {
@@ -20,93 +19,33 @@ namespace ogmaneo {
     class OGMA_API FeatureHierarchy {
     public:
         /*!
-        \brief Input desc
-        Descriptor of a layer input
-        */
-        struct InputDesc {
-            /*!
-            \brief Size of input layer
-            */
-            cl_int2 _size;
-
-            /*!
-            \brief Radii for feed forward and inhibitory connections
-            */
-            cl_int _radius;
-
-            /*!
-            \brief Initialize defaults
-            */
-            InputDesc()
-            {}
-
-            /*!
-            \brief Initialize from values
-            */
-            InputDesc(cl_int2 size, cl_int radius)
-                : _size(size), _radius(radius)
-            {}
-
-            //!@{
-            /*!
-            \brief Serialization
-            */
-            void load(const schemas::hierarchy::InputDesc* inputDesc);
-            schemas::hierarchy::InputDesc save(flatbuffers::FlatBufferBuilder &builder);
-            //!@}
-        };
-
-        /*!
         \brief Layer desc
         Descriptor of a layer in the feature hierarchy
         */
         struct LayerDesc {
             /*!
-            \brief Size of layer
+            \brief Sparse features desc
             */
-            cl_int2 _size;
+            std::shared_ptr<SparseFeatures::SparseFeaturesDesc> _sfDesc;
 
             /*!
-            \brief Input descriptors
+            \brief Temporal pooling
             */
-            std::vector<InputDesc> _inputDescs;
-
-            /*!
-            \brief Radius for recurrent connections
-            */
-            cl_int _recurrentRadius;
-
-            /*!
-            \brief Radius for inhibitory connections
-            */
-            cl_int _inhibitionRadius;
-
-            //!@{
-            /*!
-            \brief Sparse predictor parameters
-            */
-            cl_float _spFeedForwardWeightAlpha;
-            cl_float _spRecurrentWeightAlpha;
-            cl_float _spBiasAlpha;
-            cl_float _spActiveRatio;
-            //!@}
+            int _poolSteps;
 
             /*!
             \brief Initialize defaults
             */
             LayerDesc()
-                : _size({ 8, 8 }),
-                _inputDescs({ InputDesc({ 16, 16 }, 6) }), _recurrentRadius(6), _inhibitionRadius(5),
-                _spFeedForwardWeightAlpha(0.25f), _spRecurrentWeightAlpha(0.25f), _spBiasAlpha(0.01f),
-                _spActiveRatio(0.02f)
+                : _poolSteps(2)
             {}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::hierarchy::LayerDesc* fbLayerDesc);
-            flatbuffers::Offset<schemas::hierarchy::LayerDesc> save(flatbuffers::FlatBufferBuilder &builder);
+            void load(const schemas::FeatureHierarchyLayerDesc* fbFeatureHierarchyLayerDesc, ComputeSystem &cs);
+            flatbuffers::Offset<schemas::FeatureHierarchyLayerDesc> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
@@ -115,16 +54,46 @@ namespace ogmaneo {
         */
         struct Layer {
             /*!
-            \brief Sparse predictor
+            \brief Sparse features
             */
-            SparseFeatures _sp;
+            std::shared_ptr<SparseFeatures> _sf;
+
+            /*!
+            \brief Clock for temporal pooling (relative to previous layer)
+            */
+            int _clock;
+
+            /*!
+            \brief Temporal pooling buffer
+            */
+            DoubleBuffer2D _tpBuffer;
+
+            /*!
+            \brief Prediction error temporary buffer
+            */
+            cl::Image2D _predErrors;
+
+            //!@{
+            /*!
+            \brief Flags for use by other systems
+            */
+            bool _tpReset;
+            bool _tpNextReset;
+            //!@}
+
+            /*!
+            \brief Initialize defaults
+            */
+            Layer()
+                : _clock(0), _tpReset(false), _tpNextReset(false)
+            {}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::hierarchy::Layer* fbLayer, ComputeSystem &cs);
-            flatbuffers::Offset<schemas::hierarchy::Layer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::FeatureHierarchyLayer* fbFeatureHierarchyLayer, ComputeSystem &cs);
+            flatbuffers::Offset<schemas::FeatureHierarchyLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
@@ -137,6 +106,14 @@ namespace ogmaneo {
         std::vector<LayerDesc> _layerDescs;
         //!@}
 
+        //!@{
+        /*!
+        \brief Additional kernels
+        */
+        cl::Kernel _fhPoolKernel;
+        cl::Kernel _fhPredErrorKernel;
+        //!@}
+
     public:
         /*!
         \brief Initialize defaults
@@ -145,29 +122,21 @@ namespace ogmaneo {
         {}
 
         /*!
-        \brief Create a sparse feature hierarchy with random initialization.
-        Requires the ComputeSystem, ComputeProgram with the OmgaNeo kernels, and initialization information.
-        \param cs is the ComputeSystem.
-        \param program is the ComputeProgram associated with the ComputeSystem and loaded with the main kernel code.
-        \param inputDescs are the descriptors of the input layers.
-        \param layerDescs are descriptors for feature hierarchy layers.
-        \param initWeightRange are the minimum and maximum range values for weight initialization.
-        \param rng a random number generator.
+        \brief Create a sparse feature hierarchy with random initialization
+        Requires the compute system, program with the NeoRL kernels, and initialization information.
         */
-        void createRandom(ComputeSystem &cs, ComputeProgram &program,
-            const std::vector<InputDesc> &inputDescs, const std::vector<LayerDesc> &layerDescs,
-            cl_float2 initWeightRange,
+        void createRandom(ComputeSystem &cs, ComputeProgram &fhProgram,
+            const std::vector<LayerDesc> &layerDescs,
             std::mt19937 &rng);
 
         /*!
         \brief Simulation step of hierarchy
         Runs one timestep of simulation.
-        \param cs is the ComputeSystem.
         \param inputs the inputs to the bottom-most layer.
         \param rng a random number generator.
-        \param learn optional argument to disable learning.
+        \param learn optionally disable learning
         */
-        void simStep(ComputeSystem &cs, const std::vector<cl::Image2D> &inputs, std::mt19937 &rng, bool learn = true);
+        void simStep(ComputeSystem &cs, const std::vector<cl::Image2D> &inputs, const std::vector<cl::Image2D> &predictionsPrev, std::mt19937 &rng, bool learn = true);
 
         /*!
         \brief Get number of layers
@@ -202,8 +171,8 @@ namespace ogmaneo {
         /*!
         \brief Serialization
         */
-        void load(const schemas::hierarchy::FeatureHierarchy* fbFH, ComputeSystem &cs);
-        flatbuffers::Offset<schemas::hierarchy::FeatureHierarchy> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+        void load(const schemas::FeatureHierarchy* fbFeatureHierarchy, ComputeSystem &cs);
+        flatbuffers::Offset<schemas::FeatureHierarchy> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
         //!@}
     };
 }

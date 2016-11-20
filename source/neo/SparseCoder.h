@@ -8,7 +8,10 @@
 
 #pragma once
 
-#include "OgmaNeo.h"
+#include "system/SharedLib.h"
+#include "system/ComputeSystem.h"
+#include "system/ComputeProgram.h"
+#include "Helpers.h"
 
 namespace ogmaneo {
     /*!
@@ -46,7 +49,7 @@ namespace ogmaneo {
             */
             VisibleLayerDesc()
                 : _size({ 8, 8 }), _radius(6), _ignoreMiddle(false),
-                _weightAlpha(0.02f)
+                _weightAlpha(0.001f)
             {}
         };
 

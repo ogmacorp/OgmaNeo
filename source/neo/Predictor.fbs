@@ -10,21 +10,16 @@ include "Helpers.fbs";
 include "FeatureHierarchy.fbs";
 include "PredictorLayer.fbs";
 
-namespace ogmaneo.schemas.predictor;
+namespace ogmaneo.schemas;
 
-struct LayerDesc {
+struct PredLayerDesc {
 	_radius:int;
 	_alpha:float;
 	_beta:float;
 }
 
 table Predictor {
-	_h:hierarchy.FeatureHierarchy;
-	_inputSize:int2;
-	_pLayers:[Layer];
-	_pLayerDescs:[LayerDesc];
+	_h:FeatureHierarchy;
+	_pLayerDescs:[PredLayerDesc];
+	_pLayers:[PredictorLayer];
 }
-
-root_type Predictor;
-file_identifier "OPRB";
-file_extension "opr";

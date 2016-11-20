@@ -8,19 +8,24 @@
 
 include "Helpers.fbs";
 
-namespace ogmaneo.schemas.agent;
+namespace ogmaneo.schemas;
 
-struct VisibleLayerDesc {
+struct VisibleAgentLayerDesc {
     _size:int2;
     _radius:int;
-    _alpha:float;
+    _qAlpha:float;
+	_actionAlpha:float;
 }
 
-table VisibleLayer {
-    _weights:DoubleBuffer3D;
-    _hiddenToVisible:float2;
+table VisibleAgentLayer {
+    _qWeights:DoubleBuffer3D;
+	_actionWeights:DoubleBuffer3D;
+    _qToVisible:float2;
+    _visibleToQ:float2;
+    _reverseRadiiQ:int2;
+	_hiddenToVisible:float2;
     _visibleToHidden:float2;
-    _reverseRadii:int2;
+    _reverseRadiiHidden:int2;
 }
 
 table AgentLayer {
@@ -28,11 +33,12 @@ table AgentLayer {
     _actionTileSize:int2;
     _hiddenSize:int2;
     _qStates:DoubleBuffer2D;
-    _action:DoubleBuffer2D;
+    _actionProbabilities:DoubleBuffer2D;
     _actionTaken:DoubleBuffer2D;
     _tdError:Image2D;
     _oneHotAction:Image2D;
-    _hiddenSummationTemp:DoubleBuffer2D;
-    _visibleLayers:[VisibleLayer];
-    _visibleLayerDescs:[VisibleLayerDesc];
+    _hiddenSummationTempQ:DoubleBuffer2D;
+    _hiddenSummationTempHidden:DoubleBuffer2D;
+    _visibleLayerDescs:[VisibleAgentLayerDesc];
+    _visibleLayers:[VisibleAgentLayer];
 }

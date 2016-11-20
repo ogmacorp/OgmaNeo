@@ -8,7 +8,9 @@
 
 #pragma once
 
-#include "OgmaNeo.h"
+#include "system/SharedLib.h"
+#include "Helpers.h"
+#include "SparseFeatures.h"
 #include "schemas/PredictorLayer_generated.h"
 
 namespace ogmaneo {
@@ -39,16 +41,16 @@ namespace ogmaneo {
             */
             VisibleLayerDesc()
                 : _size({ 16, 16 }),
-                _radius(10),
-                _alpha(0.01f)
+                _radius(8),
+                _alpha(0.04f)
             {}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::predictor::VisibleLayerDesc* fbPredictorVisibleLayerDesc, ComputeSystem &cs);
-            schemas::predictor::VisibleLayerDesc save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::VisiblePredictorLayerDesc* fbVisiblePredictorLayerDesc, ComputeSystem &cs);
+            schemas::VisiblePredictorLayerDesc save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
@@ -60,6 +62,8 @@ namespace ogmaneo {
             /*!
             \brief Layer parameters
             */
+            DoubleBuffer2D _derivedInput;
+
             DoubleBuffer3D _weights;
 
             cl_float2 _hiddenToVisible;
@@ -72,8 +76,8 @@ namespace ogmaneo {
             /*!
             \brief Serialization
             */
-            void load(const schemas::predictor::VisibleLayer* fbPredictorVisibleLayer, ComputeSystem &cs);
-            flatbuffers::Offset<schemas::predictor::VisibleLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::VisiblePredictorLayer* fbVisiblePredictorLayer, ComputeSystem &cs);
+            flatbuffers::Offset<schemas::VisiblePredictorLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
@@ -93,6 +97,12 @@ namespace ogmaneo {
         */
         DoubleBuffer2D _hiddenStates;
 
+        /*!
+        \brief
+        Encoder corresponding to this decoder, if available (else nullptr)
+        */
+        std::shared_ptr<SparseFeatures> _inhibitSparseFeatures;
+
         //!@{
         /*!
         \brief Layers and descs
@@ -105,9 +115,9 @@ namespace ogmaneo {
         /*!
         \brief Additional kernels
         */
+        cl::Kernel _deriveInputsKernel;
         cl::Kernel _stimulusKernel;
         cl::Kernel _learnPredWeightsKernel;
-        cl::Kernel _thresholdKernel;
         //!@}
 
     public:
@@ -121,8 +131,9 @@ namespace ogmaneo {
         \param initWeightRange are the minimum and maximum range values for weight initialization.
         \param rng a random number generator.
         */
-        void createRandom(ComputeSystem &cs, ComputeProgram &program,
+        void createRandom(ComputeSystem &cs, ComputeProgram &plProgram,
             cl_int2 hiddenSize, const std::vector<VisibleLayerDesc> &visibleLayerDescs,
+            const std::shared_ptr<SparseFeatures> &inhibitSparseFeatures,
             cl_float2 initWeightRange, std::mt19937 &rng);
 
         /*!
@@ -131,7 +142,7 @@ namespace ogmaneo {
         \param visibleStates the input layer states.
         \param threshold whether or not the output should be thresholded (binary).
         */
-        void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, bool threshold);
+        void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, std::mt19937 &rng);
 
         /*!
         \brief Learn predictor
@@ -139,7 +150,7 @@ namespace ogmaneo {
         \param targets target values to update towards.
         \param visibleStatesPrev the input states of the !previous! timestep.
         */
-        void learn(ComputeSystem &cs, const cl::Image2D &targets, const std::vector<cl::Image2D> &visibleStatesPrev);
+        void learn(ComputeSystem &cs, const cl::Image2D &targets);
 
         /*!
         \brief Step end (buffer swap)
@@ -192,8 +203,8 @@ namespace ogmaneo {
         /*!
         \brief Serialization
         */
-        void load(const schemas::predictor::Layer* fbPredictorLayer, ComputeSystem &cs);
-        flatbuffers::Offset<schemas::predictor::Layer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+        void load(const schemas::PredictorLayer* fbPredictorLayer, ComputeSystem &cs);
+        flatbuffers::Offset<schemas::PredictorLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
         //!@}
     };
 }

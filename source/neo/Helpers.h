@@ -8,13 +8,13 @@
 
 #pragma once
 
+#include "system/SharedLib.h"
 #include "system/ComputeSystem.h"
 #include "system/ComputeProgram.h"
+#include "schemas/Helpers_generated.h"
 
 #include <random>
 #include <assert.h>
-
-#include "schemas/Helpers_generated.h"
 
 #ifdef _DEBUG
 #define CL_CHECK(a) \

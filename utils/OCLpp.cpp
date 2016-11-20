@@ -13,19 +13,19 @@
 #include <string.h>
 
 int main(int argc, char* argv[]) {
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s <input> <output> <tag>\n", argv[0]);
+    if (argc != 5) {
+        fprintf(stderr, "Usage: %s <common> <input> <output> <tag>\n", argv[0]);
         return 1;
     }
 
-    std::ifstream inFile(argv[1]);
-    std::ofstream outFile(argv[2]);
+    std::ifstream inFileCommon(argv[1]);
+    std::ifstream inFile(argv[2]);
+    std::ofstream outFile(argv[3]);
 
-    std::string stringTag(argv[3]);
+    std::string stringTag(argv[4]);
     std::transform(stringTag.begin(), stringTag.end(), stringTag.begin(), ::toupper);
 
-    if (inFile.is_open() && outFile.is_open())
-    {
+    if (inFileCommon.is_open() && inFile.is_open() && outFile.is_open()) {
         // Copyright and header file preamble
         outFile << "// ----------------------------------------------------------------------------" << std::endl;
         outFile << "//  OgmaNeo" << std::endl;
@@ -43,12 +43,21 @@ int main(int argc, char* argv[]) {
         outFile << "#include <string>" << std::endl;
         outFile << std::endl;
 
-        outFile << "const std::string " << argv[3] << "_ocl[] = {" << std::endl;
+        outFile << "const std::string " << argv[4] << "_ocl[] = {" << std::endl;
 
         const char* ws = " \t\n\r\f\v";
         std::string line;
-        while (std::getline(inFile, line))
-        {
+
+        // Add standard functions from neoKernelsCommon.cl
+        while (std::getline(inFileCommon, line)) {
+            // Strip certain trailing characters from the line
+            line.erase(line.find_last_not_of(ws) + 1);
+
+            // Output a string form of the line, including a trailing new-line and comma
+            outFile << "\"" << line << "\\n\"," << std::endl;
+        }
+        
+        while (std::getline(inFile, line)) {
             // Strip certain trailing characters from the line
             line.erase(line.find_last_not_of(ws) + 1);
 
@@ -60,12 +69,13 @@ int main(int argc, char* argv[]) {
         outFile << std::endl;
         outFile << "#endif" << std::endl;
     }
-    else
-    {
-        if (!inFile.is_open())
+    else {
+        if (!inFileCommon.is_open())
             std::cerr << "Unable to open file - " << argv[1] << std::endl;
-        if (!outFile.is_open())
+        if (!inFile.is_open())
             std::cerr << "Unable to open file - " << argv[2] << std::endl;
+        if (!outFile.is_open())
+            std::cerr << "Unable to open file - " << argv[3] << std::endl;
 
         return 1;
     }

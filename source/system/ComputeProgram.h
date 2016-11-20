@@ -14,6 +14,13 @@
 
 namespace ogmaneo {
     /*!
+    \brief Possible encoder identifiers
+    */
+    enum SparseFeaturesType {
+        _stdp, _delay, _chunk
+    };
+
+    /*!
     \brief Compute program.
     Holds OpenCL compute program with their associated kernels.
     */
@@ -36,9 +43,24 @@ namespace ogmaneo {
         bool loadFromFile(const std::string &name, ComputeSystem &cs);
 
         /*!
-        \brief Load main default packaged kernel
+        \brief Load hierarchy default packaged kernel
         */
-        bool loadMainKernel(ComputeSystem &cs);
+        bool loadHierarchyKernel(ComputeSystem &cs);
+
+        /*!
+        \brief Load hierarchy default packaged kernel
+        */
+        bool loadPredictorKernel(ComputeSystem &cs);
+
+        /*!
+        \brief Load hierarchy default packaged kernel
+        */
+        bool loadAgentSwarmKernel(ComputeSystem &cs);
+
+        /*!
+        \brief Loader for different sparse features (encoders)
+        */
+        bool loadSparseFeaturesKernel(ComputeSystem &cs, SparseFeaturesType type);
 
         /*!
         \brief Load extras default packaged kernel

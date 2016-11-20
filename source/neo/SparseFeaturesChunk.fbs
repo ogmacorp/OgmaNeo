@@ -1,0 +1,50 @@
+// ----------------------------------------------------------------------------
+//  OgmaNeo
+//  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+//
+//  This copy of OgmaNeo is licensed to you under the terms described
+//  in the OGMANEO_LICENSE.md file included in this distribution.
+// ----------------------------------------------------------------------------
+
+include "Helpers.fbs";
+
+namespace ogmaneo.schemas;
+
+struct VisibleChunkLayerDesc {
+	_size:int2;
+	_radius:int;
+	_ignoreMiddle:ubyte;
+	_weightAlpha:float;
+	_lambda:float;
+}
+
+table VisibleChunkLayer {
+	_derivedInput:DoubleBuffer2D;
+	_weights:DoubleBuffer3D;
+	_hiddenToVisible:float2;
+	_visibleToHidden:float2;
+	_reverseRadii:int2;
+}
+
+table SparseFeaturesChunkDesc {
+	_hiddenSize:int2;
+    _chunkSize:int2;
+    _biasAlpha:float;
+    _gamma:float;
+	_initWeightRange:float2;
+	_visibleLayerDescs:[VisibleChunkLayerDesc];
+}
+
+table SparseFeaturesChunk {
+    _hiddenStates:DoubleBuffer2D;
+    _hiddenBiases:DoubleBuffer2D;
+    _chunkWinners:Image2D;
+    _hiddenSize:int2;
+    _chunkToHidden:float2;
+    _chunkSize:int2;
+    _hiddenSummationTemp:DoubleBuffer2D;
+    _biasAlpha:float;
+    _gamma:float;
+    _visibleLayerDescs:[VisibleChunkLayerDesc];
+    _visibleLayers:[VisibleChunkLayer];
+}
