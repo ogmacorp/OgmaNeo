@@ -245,22 +245,22 @@ std::shared_ptr<class Agent> Architect::generateAgent(std::unordered_map<std::st
 
             for (int i = 0; i < _actionLayers.size(); i++) {
                 if (_actionLayers[i]._params.find("a_radius") != _actionLayers[i]._params.end())
-                    aLayerDescs[l][i]._radius = std::stoi(_actionLayers[l]._params["a_radius"]);
+                    aLayerDescs[l][i]._radius = std::stoi(_actionLayers[i]._params["a_radius"]);
 
                 if (_actionLayers[i]._params.find("a_qAlpha") != _actionLayers[i]._params.end())
-                    aLayerDescs[l][i]._qAlpha = std::stof(_actionLayers[l]._params["a_qAlpha"]);
+                    aLayerDescs[l][i]._qAlpha = std::stof(_actionLayers[i]._params["a_qAlpha"]);
 
                 if (_actionLayers[i]._params.find("a_actionAlpha") != _actionLayers[i]._params.end())
-                    aLayerDescs[l][i]._actionAlpha = std::stof(_actionLayers[l]._params["a_actionAlpha"]);
+                    aLayerDescs[l][i]._actionAlpha = std::stof(_actionLayers[i]._params["a_actionAlpha"]);
 
                 if (_actionLayers[i]._params.find("a_qGamma") != _actionLayers[i]._params.end())
-                    aLayerDescs[l][i]._qGamma = std::stof(_actionLayers[l]._params["a_qGamma"]);
+                    aLayerDescs[l][i]._qGamma = std::stof(_actionLayers[i]._params["a_qGamma"]);
 
                 if (_actionLayers[i]._params.find("a_qLambda") != _actionLayers[i]._params.end())
-                    aLayerDescs[l][i]._qLambda = std::stof(_actionLayers[l]._params["a_qLambda"]);
+                    aLayerDescs[l][i]._qLambda = std::stof(_actionLayers[i]._params["a_qLambda"]);
 
                 if (_actionLayers[i]._params.find("a_actionLambda") != _actionLayers[i]._params.end())
-                    aLayerDescs[l][i]._actionLambda = std::stof(_actionLayers[l]._params["a_actionLambda"]);
+                    aLayerDescs[l][i]._actionLambda = std::stof(_actionLayers[i]._params["a_actionLambda"]);
             }
         }
         else {

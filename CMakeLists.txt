@@ -11,20 +11,21 @@ cmake_minimum_required(VERSION 3.1)
 
 project(OgmaNeo)
 set(CMAKE_VERBOSE_MAKEFILE OFF)
+
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
-#if(NOT CMAKE_BUILD_TYPE)
-#    message(STATUS "CMAKE_BUILD_TYPE not set, setting it to Release")
-#    set(CMAKE_BUILD_TYPE Release)
-#endif()
-#message("Build type: ${CMAKE_BUILD_TYPE}")
+if(NOT CMAKE_BUILD_TYPE)
+    message("CMAKE_BUILD_TYPE not set, setting it to Release")
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-  set(BITNESS 64)
+    set(BITNESS 64)
 else()
-  set(BITNESS 32)
+    set(BITNESS 32)
 endif()
-#message("Bitness: ${BITNESS}")
+message(STATUS "Bitness: ${BITNESS}")
 
 option(BUILD_SHARED_LIBS OFF)
 message(STATUS "Shared libs: ${BUILD_SHARED_LIBS}")
@@ -235,8 +236,10 @@ add_custom_target(OgmaOCLtoH ALL DEPENDS ${outFiles})
 
 # Find list of library source code
 file(GLOB_RECURSE LIBRARY_SRC
-    "source/*.h"
-    "source/*.cpp"
+    "source/neo/*.h"
+    "source/neo/*.cpp"
+    "source/system/*.h"
+    "source/system/*.cpp"
 )
 
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/source")
@@ -265,8 +268,17 @@ endif()
 # and OpenCL to H file generation
 add_dependencies(OgmaNeo OgmaNeoSchemas OgmaOCLtoH)
 target_link_libraries(OgmaNeo ${OPENCL_LIBRARIES})
+
 set_property(TARGET OgmaNeo PROPERTY CXX_STANDARD 14)
 set_property(TARGET OgmaNeo PROPERTY CXX_STANDARD_REQUIRED ON)
+
+if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
+    if(BITNESS EQUAL 32)
+        set_target_properties(OgmaNeo PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
+    else()
+        set_target_properties(OgmaNeo PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "-m64")
+    endif()
+endif()
 
 # Library install target
 install(TARGETS OgmaNeo
@@ -276,12 +288,12 @@ install(TARGETS OgmaNeo
 
 # Headers, incl. schema headers, install targets
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/source/"
-        DESTINATION include
+        DESTINATION include/ogmaneo
         FILES_MATCHING PATTERN "*.h*")
 
 # 3rd party headers install targets
 install(DIRECTORY "${3RDPARTY_PATH}/include/"
-        DESTINATION include
+        DESTINATION include/ogmaneo
         FILES_MATCHING PATTERN "*.h*")
 
 # Uninstall target
@@ -290,5 +302,5 @@ configure_file(
     "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
     IMMEDIATE @ONLY)
 
-add_custom_target(UNINSTALL
+add_custom_target(uninstall
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
