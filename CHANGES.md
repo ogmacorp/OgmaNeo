@@ -1,3 +1,10 @@
+1.1.1 November 25, 2016
+=======================
+
+- Release fixes
+- Option to choose an OpenCL device
+- Install and uninstall CMake changes
+
 1.1  November, 2016
 ===================
 
