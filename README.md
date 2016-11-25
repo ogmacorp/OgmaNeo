@@ -10,7 +10,7 @@
 
 ## Introduction
 
-Welcome to [Ogma Intelligent Systems Corp](https://ogmacorp.com) OgmaNeo library. A C++ library that contains implementation(s) of Online Predictive Hierarchies, as described in the arXiv.org paper: [Feynman Machine: The Universal Dynamical Systems Computer](http://arxiv.org/abs/1609.03971).
+Welcome to [Ogma](https://ogmacorp.com) OgmaNeo library. A C++ library that contains implementation(s) of Online Predictive Hierarchies, as described in the arXiv.org paper: [Feynman Machine: The Universal Dynamical Systems Computer](http://arxiv.org/abs/1609.03971).
 
 The current release of this library contains a form of Sparse Predictive Hierarchies. Refer to the arXiv.org paper for further details.
 
@@ -232,7 +232,7 @@ Refer to the [CONTRIBUTING.md](https://github.com/ogmacorp/OgmaNeo/blob/master/C
 
 <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png" /></a><br />The work in this repository is licensed under the <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>. See the  [OGMANEO_LICENSE.md](https://github.com/ogmacorp/OgmaNeo/blob/master/OGMANEO_LICENSE.md) and [LICENSE.md](https://github.com/ogmacorp/OgmaNeo/blob/master/LICENSE.md) file for further information.
 
-Contact Ogma Intelligent Systems Corp licenses@ogmacorp.com to discuss commercial use and licensing options.
+Contact Ogma via licenses@ogmacorp.com to discuss commercial use and licensing options.
 
 The OgmaNeo library uses the Google [FlatBuffers](http://google.github.io/flatbuffers/) package that is licensed with an Apache License (Version 2.0). Refer to this [LICENSE.txt](https://github.com/google/flatbuffers/blob/master/LICENSE.txt) file for the full licensing text associated with the FlatBuffers package.
 

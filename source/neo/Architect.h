@@ -65,13 +65,13 @@ namespace ogmaneo {
         Resources()
         {}
 
-        Resources(ComputeSystem::DeviceType type) {
-            create(type);
+        Resources(ComputeSystem::DeviceType type, unsigned int index = 0) {
+            create(type, index);
         }
 
-        void create(ComputeSystem::DeviceType type) {
+        void create(ComputeSystem::DeviceType type, unsigned int index = 0) {
             _cs = std::make_shared<ComputeSystem>();
-            _cs->create(type);
+            _cs->create(type, index);
         }
 
         const std::shared_ptr<ComputeSystem> &getComputeSystem() const {

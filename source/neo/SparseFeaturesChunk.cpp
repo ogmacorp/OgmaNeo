@@ -181,8 +181,8 @@ void SparseFeaturesChunk::activate(ComputeSystem &cs, const std::vector<cl::Imag
 
     // Inhibit
     {
-        int chunksInX = _hiddenSize.x / _chunkSize.x + 1;
-        int chunksInY = _hiddenSize.y / _chunkSize.y + 1;
+        int chunksInX = static_cast<int>(std::ceil(static_cast<float>(_hiddenSize.x) / static_cast<float>(_chunkSize.x)));
+        int chunksInY = static_cast<int>(std::ceil(static_cast<float>(_hiddenSize.y) / static_cast<float>(_chunkSize.y)));
 
         int argIndex = 0;
 
@@ -287,8 +287,8 @@ void SparseFeaturesChunk::learn(ComputeSystem &cs, std::mt19937 &rng) {
 void SparseFeaturesChunk::inhibit(ComputeSystem &cs, const cl::Image2D &activations, cl::Image2D &states, std::mt19937 &rng) {
     // Inhibit
     {
-        int chunksInX = _hiddenSize.x / _chunkSize.x + 1;
-        int chunksInY = _hiddenSize.y / _chunkSize.y + 1;
+        int chunksInX = static_cast<int>(std::ceil(static_cast<float>(_hiddenSize.x) / static_cast<float>(_chunkSize.x)));
+        int chunksInY = static_cast<int>(std::ceil(static_cast<float>(_hiddenSize.y) / static_cast<float>(_chunkSize.y)));
 
         int argIndex = 0;
 
