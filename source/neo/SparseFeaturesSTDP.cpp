@@ -60,7 +60,7 @@ SparseFeaturesSTDP::SparseFeaturesSTDP(ComputeSystem &cs, ComputeProgram &sfhPro
             randomUniform(vl._weights[_back], cs, randomUniform3DKernel, weightsSize, initWeightRange, rng);
         }
 
-        vl._derivedInput = createDoubleBuffer2D(cs, vld._size, CL_R, CL_FLOAT);
+        vl._derivedInput = createDoubleBuffer2D(cs, vld._size, CL_RG, CL_FLOAT);
 
         cs.getQueue().enqueueFillImage(vl._derivedInput[_back], zeroColor, zeroOrigin, { static_cast<cl::size_type>(vld._size.x), static_cast<cl::size_type>(vld._size.y), 1 });
     }
@@ -84,7 +84,7 @@ SparseFeaturesSTDP::SparseFeaturesSTDP(ComputeSystem &cs, ComputeProgram &sfhPro
     _stimulusKernel = cl::Kernel(sfhProgram.getProgram(), "sfsStimulus");
     _activateKernel = cl::Kernel(sfhProgram.getProgram(), "sfsActivate");
     _inhibitKernel = cl::Kernel(sfhProgram.getProgram(), "sfsInhibit");
-    _inhibitPredKernel = cl::Kernel(sfhProgram.getProgram(), "sfsInhibitPred");
+    _inhibitOtherKernel = cl::Kernel(sfhProgram.getProgram(), "sfsInhibitOther");
     _learnWeightsKernel = cl::Kernel(sfhProgram.getProgram(), "sfsLearnWeights");
     _learnBiasesKernel = cl::Kernel(sfhProgram.getProgram(), "sfsLearnBiases");
     _deriveInputsKernel = cl::Kernel(sfhProgram.getProgram(), "sfsDeriveInputs");
@@ -106,7 +106,9 @@ void SparseFeaturesSTDP::activate(ComputeSystem &cs, const std::vector<cl::Image
             int argIndex = 0;
 
             _deriveInputsKernel.setArg(argIndex++, visibleStates[vli]);
+            _deriveInputsKernel.setArg(argIndex++, vl._derivedInput[_back]);
             _deriveInputsKernel.setArg(argIndex++, vl._derivedInput[_front]);
+            _deriveInputsKernel.setArg(argIndex++, vld._lambda);
 
             cs.getQueue().enqueueNDRangeKernel(_deriveInputsKernel, cl::NullRange, cl::NDRange(vld._size.x, vld._size.y));
         }
@@ -180,7 +182,7 @@ void SparseFeaturesSTDP::stepEnd(ComputeSystem &cs) {
     }
 }
 
-void SparseFeaturesSTDP::learn(ComputeSystem &cs, std::mt19937 &rng) {
+void SparseFeaturesSTDP::learn(ComputeSystem &cs, const cl::Image2D &predictionsPrev, std::mt19937 &rng) {
     // Learn weights
     for (int vli = 0; vli < _visibleLayers.size(); vli++) {
         VisibleLayer &vl = _visibleLayers[vli];
@@ -229,13 +231,13 @@ void SparseFeaturesSTDP::inhibit(ComputeSystem &cs, const cl::Image2D &activatio
     {
         int argIndex = 0;
 
-        _inhibitPredKernel.setArg(argIndex++, activations);
-        _inhibitPredKernel.setArg(argIndex++, states);
-        _inhibitPredKernel.setArg(argIndex++, _hiddenSize);
-        _inhibitPredKernel.setArg(argIndex++, _inhibitionRadius);
-        _inhibitPredKernel.setArg(argIndex++, _activeRatio);
+        _inhibitOtherKernel.setArg(argIndex++, activations);
+        _inhibitOtherKernel.setArg(argIndex++, states);
+        _inhibitOtherKernel.setArg(argIndex++, _hiddenSize);
+        _inhibitOtherKernel.setArg(argIndex++, _inhibitionRadius);
+        _inhibitOtherKernel.setArg(argIndex++, _activeRatio);
 
-        cs.getQueue().enqueueNDRangeKernel(_inhibitPredKernel, cl::NullRange, cl::NDRange(_hiddenSize.x, _hiddenSize.y));
+        cs.getQueue().enqueueNDRangeKernel(_inhibitOtherKernel, cl::NullRange, cl::NDRange(_hiddenSize.x, _hiddenSize.y));
     }
 }
 
@@ -289,16 +291,11 @@ flatbuffers::Offset<schemas::VisibleSTDPLayer> SparseFeaturesSTDP::VisibleLayer:
 }
 
 void SparseFeaturesSTDP::SparseFeaturesSTDPDesc::load(const schemas::SparseFeaturesSTDPDesc* fbSparseFeaturesSTDPDesc, ComputeSystem &cs) {
-    if (!_visibleLayerDescs.empty()) {
-        assert(_hiddenSize.x == fbSparseFeaturesSTDPDesc->_hiddenSize()->x());
-        assert(_hiddenSize.y == fbSparseFeaturesSTDPDesc->_hiddenSize()->y());
-        assert(_visibleLayerDescs.size() == fbSparseFeaturesSTDPDesc->_visibleLayerDescs()->Length());
-    }
-    else {
-        _hiddenSize = cl_int2{ fbSparseFeaturesSTDPDesc->_hiddenSize()->x(), fbSparseFeaturesSTDPDesc->_hiddenSize()->y() };
-        _visibleLayerDescs.reserve(fbSparseFeaturesSTDPDesc->_visibleLayerDescs()->Length());
-    }
+    assert(_hiddenSize.x == fbSparseFeaturesSTDPDesc->_hiddenSize()->x());
+    assert(_hiddenSize.y == fbSparseFeaturesSTDPDesc->_hiddenSize()->y());
+    assert(_visibleLayerDescs.size() == fbSparseFeaturesSTDPDesc->_visibleLayerDescs()->Length());
 
+    _hiddenSize = cl_int2{ fbSparseFeaturesSTDPDesc->_hiddenSize()->x(), fbSparseFeaturesSTDPDesc->_hiddenSize()->y() };
     _inhibitionRadius = fbSparseFeaturesSTDPDesc->_inhibitionRadius();
     _biasAlpha = fbSparseFeaturesSTDPDesc->_biasAlpha();
     _activeRatio = fbSparseFeaturesSTDPDesc->_activeRatio();
@@ -328,24 +325,18 @@ void SparseFeaturesSTDP::load(const schemas::SparseFeatures* fbSparseFeatures, C
     schemas::SparseFeaturesSTDP* fbSparseFeaturesSTDP =
         (schemas::SparseFeaturesSTDP*)(fbSparseFeatures->_sf());
 
-    if (!_visibleLayers.empty()) {
-        assert(_hiddenSize.x == fbSparseFeaturesSTDP->_hiddenSize()->x());
-        assert(_hiddenSize.y == fbSparseFeaturesSTDP->_hiddenSize()->y());
-        assert(_visibleLayerDescs.size() == fbSparseFeaturesSTDP->_visibleLayerDescs()->Length());
-        assert(_visibleLayers.size() == fbSparseFeaturesSTDP->_visibleLayers()->Length());
-    }
-    else {
-        _hiddenSize.x = fbSparseFeaturesSTDP->_hiddenSize()->x();
-        _hiddenSize.y = fbSparseFeaturesSTDP->_hiddenSize()->y();
-        _visibleLayerDescs.reserve(fbSparseFeaturesSTDP->_visibleLayerDescs()->Length());
-        _visibleLayers.reserve(fbSparseFeaturesSTDP->_visibleLayers()->Length());
-    }
+    assert(_hiddenSize.x == fbSparseFeaturesSTDP->_hiddenSize()->x());
+    assert(_hiddenSize.y == fbSparseFeaturesSTDP->_hiddenSize()->y());
+    assert(_visibleLayerDescs.size() == fbSparseFeaturesSTDP->_visibleLayerDescs()->Length());
+    assert(_visibleLayers.size() == fbSparseFeaturesSTDP->_visibleLayers()->Length());
+
+    _hiddenSize = cl_int2{ fbSparseFeaturesSTDP->_hiddenSize()->x(), fbSparseFeaturesSTDP->_hiddenSize()->y() };
+
+    _inhibitionRadius = fbSparseFeaturesSTDP->_inhibitionRadius();
+
     ogmaneo::load(_hiddenActivations, fbSparseFeaturesSTDP->_hiddenActivations(), cs);
     ogmaneo::load(_hiddenStates, fbSparseFeaturesSTDP->_hiddenStates(), cs);
     ogmaneo::load(_hiddenBiases, fbSparseFeaturesSTDP->_hiddenBiases(), cs);
-    
-    _inhibitionRadius = fbSparseFeaturesSTDP->_inhibitionRadius();
-
     ogmaneo::load(_hiddenSummationTemp, fbSparseFeaturesSTDP->_hiddenSummationTemp(), cs);
 
     for (flatbuffers::uoffset_t i = 0; i < fbSparseFeaturesSTDP->_visibleLayerDescs()->Length(); i++) {

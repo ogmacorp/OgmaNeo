@@ -12,7 +12,8 @@
 
 using namespace ogmaneo;
 
-bool ComputeSystem::create(DeviceType type, unsigned int index, bool createFromGLContext) {
+bool ComputeSystem::create(DeviceType type, int platformIndex, int deviceIndex, bool createFromGLContext) {
+    int index;
     std::vector<cl::Platform> allPlatforms;
     cl::Platform::get(&allPlatforms);
 
@@ -23,13 +24,26 @@ bool ComputeSystem::create(DeviceType type, unsigned int index, bool createFromG
         return false;
     }
 #ifdef SYS_DEBUG
-    std::cout << allPlatforms.size() <<  " platforms found." << std::endl;
+    std::cout << "Found " << allPlatforms.size() << " platform(s)." << std::endl;
+
+    index = 0;
+    for (auto platform : allPlatforms)
+        std::cout << "Platform " << index++ << ": " << platform.getInfo<CL_PLATFORM_NAME>() << std::endl;
 #endif
 
-    _platform = allPlatforms.front();
+    if (platformIndex < 0)
+        platformIndex = allPlatforms.size() - 1;
+
+    if (platformIndex >= allPlatforms.size()) {
+#ifdef SYS_DEBUG
+        std::cout << "Indexed platform not found." << std::endl;
+#endif
+        return false;
+    }
+    _platform = allPlatforms[platformIndex];
 
 #ifdef SYS_DEBUG
-    std::cout << "Using platform: " << _platform.getInfo<CL_PLATFORM_NAME>() << std::endl;
+    std::cout << "Using platform: " << _platform.getInfo<CL_PLATFORM_NAME>() << std::endl << std::endl;
 #endif
 
     std::vector<cl::Device> allDevices;
@@ -47,13 +61,16 @@ bool ComputeSystem::create(DeviceType type, unsigned int index, bool createFromG
     }
 
     if (!allDevices.empty()) {
-        if (index >= allDevices.size()) {
+        if (deviceIndex < 0)
+            deviceIndex = allDevices.size() - 1;
+
+        if (deviceIndex >= allDevices.size()) {
 #ifdef SYS_DEBUG
             std::cout << "Indexed device not found." << std::endl;
 #endif
             return false;
         }
-        _device = allDevices[index];
+        _device = allDevices[deviceIndex];
 
         std::vector<size_t> workItemSizes;
         _device.getInfo(CL_DEVICE_MAX_WORK_ITEM_SIZES, &workItemSizes);
@@ -79,17 +96,24 @@ bool ComputeSystem::create(DeviceType type, unsigned int index, bool createFromG
         }
     }
 
-    if (allDevices.empty() || index >= allDevices.size()) {
+    if (allDevices.empty() || deviceIndex >= allDevices.size()) {
 #ifdef SYS_DEBUG
         std::cout << "No devices found. Check your OpenCL installation." << std::endl;
 #endif
         return false;
     }
+#ifdef SYS_DEBUG
+    std::cout << "Found " << allDevices.size() << " device(s)." << std::endl;
 
-    _device = allDevices[index];
+    index = 0;
+    for (auto device : allDevices)
+        std::cout << "Device " << index++ << ": " << device.getInfo<CL_DEVICE_NAME>() << std::endl;
+#endif
+
+    _device = allDevices[deviceIndex];
 
 #ifdef SYS_DEBUG
-    std::cout << "Using device: " << _device.getInfo<CL_DEVICE_NAME>() << std::endl;
+    std::cout << "Using device: " << _device.getInfo<CL_DEVICE_NAME>() << std::endl << std::endl;
 #endif
 
 #if(SYS_ALLOW_CL_GL_CONTEXT)

@@ -35,7 +35,6 @@ namespace ogmaneo {
             cl_int _radius;
 
             cl_float _qAlpha;
-            cl_float _actionAlpha;
             //!@}
 
             /*!
@@ -44,8 +43,7 @@ namespace ogmaneo {
             VisibleLayerDesc()
                 : _size({ 16, 16 }),
                 _radius(12),
-                _qAlpha(0.001f),
-                _actionAlpha(0.02f)
+                _qAlpha(0.001f)
             {}
 
             //!@{
@@ -65,18 +63,14 @@ namespace ogmaneo {
             /*!
             \brief Layer data
             */
+            DoubleBuffer2D _derivedInput;
+
             DoubleBuffer3D _qWeights;
-            DoubleBuffer3D _actionWeights;
-
-            cl_float2 _qToVisible;
-            cl_float2 _visibleToQ;
-
-            cl_int2 _reverseRadiiQ;
 
             cl_float2 _hiddenToVisible;
             cl_float2 _visibleToHidden;
 
-            cl_int2 _reverseRadiiHidden;
+            cl_int2 _reverseRadii;
             //!@}
 
             //!@{
@@ -110,20 +104,18 @@ namespace ogmaneo {
         Q states, actions, td errors, one hot action
         */
         DoubleBuffer2D _qStates;
-        DoubleBuffer2D _actionProbabilities;
 
         DoubleBuffer2D _actionTaken;
+        DoubleBuffer2D _actionTakenMax;
+        DoubleBuffer2D _spreadStates;
+        DoubleBuffer2D _oneHotAction;
         cl::Image2D _tdError;
-        cl::Image2D _oneHotAction;
         //!@}
 
-        //!@{
         /*!
-        \brief Hidden stimulus summation temporary buffers
+        \brief Hidden stimulus summation temporary buffer
         */
         DoubleBuffer2D _hiddenSummationTempQ;
-        DoubleBuffer2D _hiddenSummationTempHidden;
-        //!@}
 
         //!@{
         /*!
@@ -137,12 +129,13 @@ namespace ogmaneo {
         /*!
         \brief Additional kernels
         */
+        cl::Kernel _deriveInputsKernel;
         cl::Kernel _activateKernel;
         cl::Kernel _learnQKernel;
-        cl::Kernel _learnActionsKernel;
         cl::Kernel _actionToOneHotKernel;
         cl::Kernel _getActionKernel;
         cl::Kernel _setActionKernel;
+        cl::Kernel _spreadKernel;
         //!@}
 
     public:
@@ -182,7 +175,7 @@ namespace ogmaneo {
         \param learn optional argument to disable learning.
         */
         void simStep(ComputeSystem &cs, float reward, const std::vector<cl::Image2D> &visibleStates, const cl::Image2D &modulator,
-            float qGamma, float qLambda, float actionLambda, float maxActionWeightMag, std::mt19937 &rng, bool learn = true);
+            float qGamma, float qLambda, float epsilon, float chunkGamma, cl_int2 chunkSize, std::mt19937 &rng, bool learn = true);
 
         /*!
         \brief Clear memory (recurrent data)
@@ -221,13 +214,6 @@ namespace ogmaneo {
         }
 
         /*!
-        \brief Get the hidden action activations
-        */
-        const DoubleBuffer2D &getActionActivations() const {
-            return _actionProbabilities;
-        }
-
-        /*!
         \brief Get the actions
         */
         const DoubleBuffer2D &getActions() const {
@@ -238,7 +224,14 @@ namespace ogmaneo {
         \brief Get the actions in one-hot form
         */
         const cl::Image2D &getOneHotActions() const {
-            return _oneHotAction;
+            return _oneHotAction[_back];
+        }
+
+        /*!
+        \brief Get the actions in one-hot form
+        */
+        const cl::Image2D &getSpreadStates() const {
+            return _spreadStates[_back];
         }
 
         /*!

@@ -1,3 +1,11 @@
+1.2  December 19, 2016
+========================
+
+- New ReLU encoder
+- Updates to WIP swarming agent
+- Architect fix for reloading a hierarchy
+- Extra internal state accessors
+
 1.1.1 November 25, 2016
 =======================
 

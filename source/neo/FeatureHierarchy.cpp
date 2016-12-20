@@ -10,6 +10,7 @@
 #include "SparseFeaturesChunk.h"
 #include "SparseFeaturesDelay.h"
 #include "SparseFeaturesSTDP.h"
+#include "SparseFeaturesReLU.h"
 
 using namespace ogmaneo;
 
@@ -70,7 +71,7 @@ void FeatureHierarchy::simStep(ComputeSystem &cs, const std::vector<cl::Image2D>
             _layers[l]._sf->activate(cs, visibleStates, predictionsPrev[l], rng);
 
             if (learn)
-                _layers[l]._sf->learn(cs, rng);
+                _layers[l]._sf->learn(cs, predictionsPrev[l], rng);
 
             _layers[l]._sf->stepEnd(cs);
 
@@ -147,8 +148,10 @@ flatbuffers::Offset<schemas::FeatureHierarchyLayer> FeatureHierarchy::Layer::sav
     default:
     case SparseFeaturesType::_chunk:    type = schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesChunk; break;
     case SparseFeaturesType::_delay:    type = schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesDelay; break;
-    case SparseFeaturesType::_stdp:  type = schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesSTDP; break;
+    case SparseFeaturesType::_stdp:     type = schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesSTDP; break;
+    case SparseFeaturesType::_ReLU:     type = schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesReLU; break;
     }
+
     return schemas::CreateFeatureHierarchyLayer(builder,
         type, _sf->save(builder, cs).Union(),
         _clock,
@@ -158,14 +161,8 @@ flatbuffers::Offset<schemas::FeatureHierarchyLayer> FeatureHierarchy::Layer::sav
 }
 
 void FeatureHierarchy::load(const schemas::FeatureHierarchy* fbFeatureHierarchy, ComputeSystem &cs) {
-    if (!_layers.empty()) {
-        assert(_layerDescs.size() == fbFeatureHierarchy->_layerDescs()->Length());
-        assert(_layers.size() == fbFeatureHierarchy->_layers()->Length());
-    }
-    else {
-        _layerDescs.reserve(fbFeatureHierarchy->_layerDescs()->Length());
-        _layers.reserve(fbFeatureHierarchy->_layers()->Length());
-    }
+    assert(_layerDescs.size() == fbFeatureHierarchy->_layerDescs()->Length());
+    assert(_layers.size() == fbFeatureHierarchy->_layers()->Length());
 
     for (flatbuffers::uoffset_t i = 0; i < fbFeatureHierarchy->_layerDescs()->Length(); i++) {
         _layerDescs[i].load(fbFeatureHierarchy->_layerDescs()->Get(i), cs);

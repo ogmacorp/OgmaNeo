@@ -17,7 +17,7 @@ namespace ogmaneo {
     \brief Possible encoder identifiers
     */
     enum SparseFeaturesType {
-        _stdp, _delay, _chunk
+        _stdp, _delay, _chunk, _ReLU
     };
 
     /*!

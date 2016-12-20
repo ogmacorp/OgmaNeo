@@ -17,6 +17,7 @@ namespace ogmaneo {
     // Declarations required for SWIG
     class ValueField2D;
     class Predictor;
+    class PredictorLayer;
 
     /*!
     \brief Default Hierarchy implementation (Predictor)
@@ -31,6 +32,7 @@ namespace ogmaneo {
         std::mt19937 _rng;
 
         std::vector<cl::Image2D> _inputImages;
+        std::vector<cl::Image2D> _corruptedInputImages;
 
         std::vector<ValueField2D> _predictions;
 
@@ -51,6 +53,21 @@ namespace ogmaneo {
         \brief Run a single simulation tick
         */
         void simStep(std::vector<ValueField2D> &inputs, bool learn = true);
+        void simStep(std::vector<ValueField2D> &inputs, std::vector<ValueField2D> &corruptedInputs, bool learn = true);
+
+        /*!
+        \brief Get the input images
+        */
+        const std::vector<cl::Image2D> &getInputImages() const {
+            return _inputImages;
+        }
+
+        /*!
+        \brief Get the corrupted input images
+        */
+        const std::vector<cl::Image2D> &getCorruptedInputImages() const {
+            return _corruptedInputImages;
+        }
 
         /*!
         \brief Get the action vector
@@ -65,6 +82,18 @@ namespace ogmaneo {
         Predictor &getPredictor() {
             return _p;
         }
+
+        /*!
+        \brief Get the prediction read out layers
+        */
+        const std::vector<PredictorLayer> &getReadOutPredictorLayers() const {
+            return _readoutLayers;
+        }
+
+        /*!
+        \brief Specifically for accessing chunk states from bindings
+        */
+        void readChunkStates(int li, ValueField2D &valueField);
 
         //!@{
         /*!

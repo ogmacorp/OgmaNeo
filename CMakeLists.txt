@@ -138,7 +138,7 @@ else()
     get_filename_component(CL2_HPP_DIR "${CL2_HPP_NAME}" DIRECTORY)
     message(STATUS "CL2.HPP found in ${CL2_HPP_DIR}")
 
-    include_directories(SYSTEM "${CL2_HPP_DIR}")
+    include_directories(SYSTEM "${CL2_HPP_DIR}/..")
 endif()
 
 
@@ -273,9 +273,7 @@ set_property(TARGET OgmaNeo PROPERTY CXX_STANDARD 14)
 set_property(TARGET OgmaNeo PROPERTY CXX_STANDARD_REQUIRED ON)
 
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
-    if(BITNESS EQUAL 32)
-        set_target_properties(OgmaNeo PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
-    else()
+    if(BITNESS EQUAL 64)
         set_target_properties(OgmaNeo PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "-m64")
     endif()
 endif()

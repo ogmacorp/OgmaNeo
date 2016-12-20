@@ -19,9 +19,9 @@
 #ifdef _DEBUG
 #define CL_CHECK(a) \
 {\
-	cl_int result = (a);\
-	if (result != CL_SUCCESS)\
-		std::cerr << ogmaneo::clErrorString(result) << std::endl;\
+	cl_int clCheckResult = (a);\
+	if (clCheckResult != CL_SUCCESS)\
+		std::cerr << ogmaneo::clErrorString(clCheckResult) << std::endl;\
 }
 #else
 #define CL_CHECK(a) (a)
@@ -78,12 +78,12 @@ namespace ogmaneo {
     */
     void load(cl::Image2D &img, const schemas::Image2D* fbImg, ComputeSystem &cs);
     void load(cl::Image3D &img, const schemas::Image3D* fbImg, ComputeSystem &cs);
-    flatbuffers::Offset<schemas::Image2D> save(cl::Image2D &img, flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs);
-    flatbuffers::Offset<schemas::Image3D> save(cl::Image3D &img, flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs);
+    flatbuffers::Offset<schemas::Image2D> save(cl::Image2D &img, flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+    flatbuffers::Offset<schemas::Image3D> save(cl::Image3D &img, flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
 
     void load(DoubleBuffer2D &db, const schemas::DoubleBuffer2D* fbDB, ComputeSystem &cs);
     void load(DoubleBuffer3D &db, const schemas::DoubleBuffer3D* fbDB, ComputeSystem &cs);
-    flatbuffers::Offset<schemas::DoubleBuffer2D> save(DoubleBuffer2D &db, flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs);
-    flatbuffers::Offset<schemas::DoubleBuffer3D> save(DoubleBuffer3D &db, flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs);
+    flatbuffers::Offset<schemas::DoubleBuffer2D> save(DoubleBuffer2D &db, flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+    flatbuffers::Offset<schemas::DoubleBuffer3D> save(DoubleBuffer3D &db, flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
     //!@}
 }

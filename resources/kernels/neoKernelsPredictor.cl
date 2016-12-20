@@ -13,7 +13,9 @@ void kernel plDeriveInputs(read_only image2d_t inputs, read_only image2d_t outpu
 
     float input = read_imagef(inputs, defaultSampler, position).x;
 
-    write_imagef(outputsFront, position, (float4)(input, 0.0f, 0.0f, 0.0f));
+	float outputPrev = read_imagef(outputsBack, defaultSampler, position).x;
+
+    write_imagef(outputsFront, position, (float4)(input, fabs(input - outputPrev), 0.0f, 0.0f));
 }
 
 void kernel plStimulus(read_only image2d_t visibleStates,
@@ -27,6 +29,7 @@ void kernel plStimulus(read_only image2d_t visibleStates,
     float sum = read_imagef(hiddenSummationTempBack, defaultSampler, hiddenPosition).x;
 
     float subSum = 0.0f;
+	float stateSum = 0.0f;
 
     int2 fieldLowerBound = visiblePositionCenter - (int2)(radius);
 
@@ -44,10 +47,11 @@ void kernel plStimulus(read_only image2d_t visibleStates,
                 float visibleState = read_imagef(visibleStates, defaultSampler, visiblePosition).x;
 
                 subSum += visibleState * weight;
+				stateSum += visibleState;
             }
         }
 
-    write_imagef(hiddenSummationTempFront, hiddenPosition, (float4)(sum + subSum, 0.0f, 0.0f, 0.0f));
+    write_imagef(hiddenSummationTempFront, hiddenPosition, (float4)(sum + subSum / fmax(0.0001f, stateSum), 0.0f, 0.0f, 0.0f));
 }
 
 void kernel plLearnPredWeights(read_only image2d_t visibleStatesPrev,
@@ -73,9 +77,9 @@ void kernel plLearnPredWeights(read_only image2d_t visibleStatesPrev,
 
                 float weightPrev = read_imagef(weightsBack, defaultSampler, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0)).x;
 
-                float visibleStatePrev = read_imagef(visibleStatesPrev, defaultSampler, visiblePosition).x;
+                float2 visibleStatePrev = read_imagef(visibleStatesPrev, defaultSampler, visiblePosition).xy;
 
-                float weight = weightPrev + alpha * error * visibleStatePrev;
+                float weight = weightPrev + alpha * error * visibleStatePrev.x * visibleStatePrev.y;
 
                 write_imagef(weightsFront, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0), (float4)(weight, 0.0f, 0.0f, 0.0f));
             }

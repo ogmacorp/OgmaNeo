@@ -58,7 +58,7 @@ namespace ogmaneo {
             */
             VisibleLayerDesc()
                 : _size({ 8, 8 }), _radius(6), _ignoreMiddle(false),
-                _weightAlpha(0.0001f), _lambda(0.9f), _gamma(0.96f)
+                _weightAlpha(0.0f), _lambda(0.9f), _gamma(0.96f)
             {}
 
             //!@{
@@ -129,7 +129,7 @@ namespace ogmaneo {
             SparseFeaturesDelayDesc()
                 : _hiddenSize({ 16, 16 }),
                 _inhibitionRadius(6),
-                _biasAlpha(0.1f), _activeRatio(0.04f),
+                _biasAlpha(0.01f), _activeRatio(0.01f),
                 _initWeightRange({ -0.01f, 0.01f }),
                 _rng()
             {
@@ -257,7 +257,7 @@ namespace ogmaneo {
         \param activeRatio % active units.
         \param gamma synaptic trace decay.
         */
-        void learn(ComputeSystem &cs, std::mt19937 &rng) override;
+        void learn(ComputeSystem &cs, const cl::Image2D &predictionsPrev, std::mt19937 &rng) override;
 
         /*!
         \brief Inhibit
@@ -298,6 +298,20 @@ namespace ogmaneo {
         */
         const DoubleBuffer2D &getHiddenStates() const override {
             return _hiddenStates;
+        }
+
+        /*!
+        \brief Get hidden activations
+        */
+        const DoubleBuffer2D &getHiddenActivations() const {
+            return _hiddenActivations;
+        }
+
+        /*!
+        \brief Get hidden biases
+        */
+        const DoubleBuffer2D &getHiddenBiases() const {
+            return _hiddenBiases;
         }
 
         /*!

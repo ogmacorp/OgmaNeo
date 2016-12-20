@@ -10,6 +10,7 @@
 #include "SparseFeaturesChunk.h"
 #include "SparseFeaturesDelay.h"
 #include "SparseFeaturesSTDP.h"
+#include "SparseFeaturesReLU.h"
 
 using namespace ogmaneo;
 
@@ -63,17 +64,19 @@ void PredictorLayer::createRandom(ComputeSystem &cs, ComputeProgram &plProgram,
             randomUniform(vl._weights[_back], cs, randomUniform3DKernel, weightsSize, initWeightRange, rng);
         }
 
-        vl._derivedInput = createDoubleBuffer2D(cs, vld._size, CL_R, CL_FLOAT);
+        vl._derivedInput = createDoubleBuffer2D(cs, vld._size, CL_RG, CL_FLOAT);
 
         cs.getQueue().enqueueFillImage(vl._derivedInput[_back], zeroColor, zeroOrigin, { static_cast<cl::size_type>(vld._size.x), static_cast<cl::size_type>(vld._size.y), 1 });
     }
 
     // Hidden state data
     _hiddenStates = createDoubleBuffer2D(cs, _hiddenSize, CL_R, CL_FLOAT);
+    _hiddenActivations = createDoubleBuffer2D(cs, _hiddenSize, CL_R, CL_FLOAT);
 
     _hiddenSummationTemp = createDoubleBuffer2D(cs, _hiddenSize, CL_R, CL_FLOAT);
 
     cs.getQueue().enqueueFillImage(_hiddenStates[_back], zeroColor, zeroOrigin, hiddenRegion);
+    cs.getQueue().enqueueFillImage(_hiddenActivations[_back], zeroColor, zeroOrigin, hiddenRegion);
 
     // Create kernels
     _deriveInputsKernel = cl::Kernel(plProgram.getProgram(), "plDeriveInputs");
@@ -85,7 +88,7 @@ void PredictorLayer::activate(ComputeSystem &cs, const std::vector<cl::Image2D> 
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
     cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
-    // Start by clearing stimulus summation buffer to biases
+    // Start by clearing stimulus summation buffer
     cs.getQueue().enqueueFillImage(_hiddenSummationTemp[_back], cl_float4{ 0.0f, 0.0f, 0.0f, 0.0f }, zeroOrigin, hiddenRegion);
 
     // Find up stimulus
@@ -100,7 +103,7 @@ void PredictorLayer::activate(ComputeSystem &cs, const std::vector<cl::Image2D> 
             _deriveInputsKernel.setArg(argIndex++, visibleStates[vli]);
             _deriveInputsKernel.setArg(argIndex++, vl._derivedInput[_back]);
             _deriveInputsKernel.setArg(argIndex++, vl._derivedInput[_front]);
- 
+
             cs.getQueue().enqueueNDRangeKernel(_deriveInputsKernel, cl::NullRange, cl::NDRange(vld._size.x, vld._size.y));
         }
 
@@ -128,6 +131,8 @@ void PredictorLayer::activate(ComputeSystem &cs, const std::vector<cl::Image2D> 
         // Copy to hidden states
         cs.getQueue().enqueueCopyImage(_hiddenSummationTemp[_back], _hiddenStates[_front], zeroOrigin, zeroOrigin, hiddenRegion);
     }
+
+    cs.getQueue().enqueueCopyImage(_hiddenSummationTemp[_back], _hiddenActivations[_front], zeroOrigin, zeroOrigin, hiddenRegion);
 }
 
 void PredictorLayer::stepEnd(ComputeSystem &cs) {
@@ -135,6 +140,7 @@ void PredictorLayer::stepEnd(ComputeSystem &cs) {
     cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
     std::swap(_hiddenStates[_front], _hiddenStates[_back]);
+    std::swap(_hiddenActivations[_front], _hiddenActivations[_back]);
 
     // Swap buffers
     for (int vli = 0; vli < _visibleLayers.size(); vli++) {
@@ -177,8 +183,8 @@ void PredictorLayer::clearMemory(ComputeSystem &cs) {
 
     // Clear buffers
     cs.getQueue().enqueueFillImage(_hiddenStates[_back], zeroColor, zeroOrigin, hiddenRegion);
+    cs.getQueue().enqueueFillImage(_hiddenActivations[_back], zeroColor, zeroOrigin, hiddenRegion);
 }
-
 
 void PredictorLayer::VisibleLayerDesc::load(const schemas::VisiblePredictorLayerDesc* fbVisiblePredictorLayerDesc, ComputeSystem &cs) {
     _size = cl_int2{ fbVisiblePredictorLayerDesc->_size().x(), fbVisiblePredictorLayerDesc->_size().y() };
@@ -211,22 +217,16 @@ flatbuffers::Offset<schemas::VisiblePredictorLayer> PredictorLayer::VisibleLayer
 }
 
 void PredictorLayer::load(const schemas::PredictorLayer* fbPredictorLayer, ComputeSystem &cs) {
-    if (!_visibleLayers.empty()) {
-        assert(_hiddenSize.x == fbPredictorLayer->_hiddenSize()->x());
-        assert(_hiddenSize.y == fbPredictorLayer->_hiddenSize()->y());
-        assert(_visibleLayerDescs.size() == fbPredictorLayer->_visibleLayerDescs()->Length());
-        assert(_visibleLayers.size() == fbPredictorLayer->_visibleLayers()->Length());
-    }
-    else {
-        _hiddenSize.x = fbPredictorLayer->_hiddenSize()->x();
-        _hiddenSize.y = fbPredictorLayer->_hiddenSize()->y();
-        _visibleLayerDescs.reserve(fbPredictorLayer->_visibleLayerDescs()->Length());
-        _visibleLayers.reserve(fbPredictorLayer->_visibleLayers()->Length());
-    }
+    assert(_hiddenSize.x == fbPredictorLayer->_hiddenSize()->x());
+    assert(_hiddenSize.y == fbPredictorLayer->_hiddenSize()->y());
+    assert(_visibleLayerDescs.size() == fbPredictorLayer->_visibleLayerDescs()->Length());
+    assert(_visibleLayers.size() == fbPredictorLayer->_visibleLayers()->Length());
+
     _hiddenSize = cl_int2{ fbPredictorLayer->_hiddenSize()->x(), fbPredictorLayer->_hiddenSize()->y() };
 
     ogmaneo::load(_hiddenSummationTemp, fbPredictorLayer->_hiddenSummationTemp(), cs);
     ogmaneo::load(_hiddenStates, fbPredictorLayer->_hiddenStates(), cs);
+    ogmaneo::load(_hiddenActivations, fbPredictorLayer->_hiddenActivations(), cs);
 
     if (fbPredictorLayer->_inhibitSparseFeatures()) {
         if (_inhibitSparseFeatures == nullptr) {
@@ -240,6 +240,9 @@ void PredictorLayer::load(const schemas::PredictorLayer* fbPredictorLayer, Compu
                 break;
             case schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesSTDP:
                 _inhibitSparseFeatures = std::make_shared<SparseFeaturesSTDP>();
+                break;
+            case schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesReLU:
+                _inhibitSparseFeatures = std::make_shared<SparseFeaturesReLU>();
                 break;
             default:
                 // Unknown SparseFeatures type
@@ -277,6 +280,7 @@ flatbuffers::Offset<schemas::PredictorLayer> PredictorLayer::save(flatbuffers::F
         &hiddenSize,
         ogmaneo::save(_hiddenSummationTemp, builder, cs),
         ogmaneo::save(_hiddenStates, builder, cs),
+        ogmaneo::save(_hiddenActivations, builder, cs),
         ((_inhibitSparseFeatures != nullptr) ? _inhibitSparseFeatures->save(builder, cs) : 0),
         builder.CreateVectorOfStructs(visibleLayerDescs),
         builder.CreateVector(visibleLayers));

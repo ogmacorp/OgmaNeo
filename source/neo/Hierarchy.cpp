@@ -32,22 +32,43 @@ void Hierarchy::simStep(std::vector<ValueField2D> &inputs, bool learn) {
     }
 }
 
+void Hierarchy::simStep(std::vector<ValueField2D> &inputs, std::vector<ValueField2D> &corruptedInputs, bool learn) {
+    // Write input
+    for (int i = 0; i < _inputImages.size(); i++)
+        _resources->_cs->getQueue().enqueueWriteImage(_inputImages[i], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(inputs[i].getSize().x), static_cast<cl::size_type>(inputs[i].getSize().y), 1 }, 0, 0, inputs[i].getData().data());
+
+    for (int i = 0; i < _corruptedInputImages.size(); i++)
+        _resources->_cs->getQueue().enqueueWriteImage(_corruptedInputImages[i], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(corruptedInputs[i].getSize().x), static_cast<cl::size_type>(corruptedInputs[i].getSize().y), 1 }, 0, 0, corruptedInputs[i].getData().data());
+
+    _p.simStep(*_resources->_cs, _inputImages, _corruptedInputImages, _rng, learn);
+
+    // Get predictions
+    for (int i = 0; i < _predictions.size(); i++) {
+        _readoutLayers[i].activate(*_resources->_cs, { _p.getHiddenPrediction()[_back] }, _rng);
+
+        if (learn)
+            _readoutLayers[i].learn(*_resources->_cs, _inputImages[i]);
+
+        _readoutLayers[i].stepEnd(*_resources->_cs);
+
+        _resources->_cs->getQueue().enqueueReadImage(_readoutLayers[i].getHiddenStates()[_back], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(_predictions[i].getSize().x), static_cast<cl::size_type>(_predictions[i].getSize().y), 1 }, 0, 0, _predictions[i].getData().data());
+    }
+}
+
 void Hierarchy::load(const schemas::Hierarchy* fbHierarchy, ComputeSystem &cs) {
-    if (!_inputImages.empty()) {
-        assert(_inputImages.size() == fbHierarchy->_inputImages()->Length());
-        assert(_predictions.size() == fbHierarchy->_predictions()->Length());
-        assert(_readoutLayers.size() == fbHierarchy->_readoutLayers()->Length());
-    }
-    else {
-        _inputImages.reserve(fbHierarchy->_inputImages()->Length());
-        _predictions.reserve(fbHierarchy->_predictions()->Length());
-        _readoutLayers.reserve(fbHierarchy->_readoutLayers()->Length());
-    }
+    assert(_inputImages.size() == fbHierarchy->_inputImages()->Length());
+    assert(_corruptedInputImages.size() == fbHierarchy->_corruptedInputImages()->Length());
+    assert(_predictions.size() == fbHierarchy->_predictions()->Length());
+    assert(_readoutLayers.size() == fbHierarchy->_readoutLayers()->Length());
 
     _p.load(fbHierarchy->_p(), cs);
 
     for (flatbuffers::uoffset_t i = 0; i < fbHierarchy->_inputImages()->Length(); i++) {
         ogmaneo::load(_inputImages[i], fbHierarchy->_inputImages()->Get(i), cs);
+    }
+
+    for (flatbuffers::uoffset_t i = 0; i < fbHierarchy->_corruptedInputImages()->Length(); i++) {
+        ogmaneo::load(_corruptedInputImages[i], fbHierarchy->_corruptedInputImages()->Get(i), cs);
     }
 
     for (flatbuffers::uoffset_t i = 0; i < fbHierarchy->_predictions()->Length(); i++) {
@@ -64,6 +85,10 @@ flatbuffers::Offset<schemas::Hierarchy> Hierarchy::save(flatbuffers::FlatBufferB
     for (cl::Image2D image : _inputImages)
         inputImages.push_back(ogmaneo::save(image, builder, cs));
 
+    std::vector<flatbuffers::Offset<schemas::Image2D>> corruptedInputImages;
+    for (cl::Image2D image : _corruptedInputImages)
+        corruptedInputImages.push_back(ogmaneo::save(image, builder, cs));
+
     std::vector<flatbuffers::Offset<schemas::ValueField2D>> predictions;
     for (ValueField2D values : _predictions)
         predictions.push_back(values.save(builder, cs));
@@ -75,6 +100,7 @@ flatbuffers::Offset<schemas::Hierarchy> Hierarchy::save(flatbuffers::FlatBufferB
     return schemas::CreateHierarchy(builder,
         _p.save(builder, cs),
         builder.CreateVector(inputImages),
+        builder.CreateVector(corruptedInputImages),
         builder.CreateVector(predictions),
         builder.CreateVector(readoutLayers));
 }
@@ -112,7 +138,7 @@ void Hierarchy::save(ComputeSystem &cs, const std::string &fileName) {
     schemas::FinishHierarchyBuffer(builder, h);
 
     // Get the built buffer and size
-    uint8_t *buf = builder.GetBufferPointer();
+    uint8_t* buf = builder.GetBufferPointer();
     size_t size = builder.GetSize();
 
     flatbuffers::Verifier verifier = flatbuffers::Verifier(buf, size);
@@ -128,4 +154,12 @@ void Hierarchy::save(ComputeSystem &cs, const std::string &fileName) {
     }
 
     return; //verified;
+}
+
+void Hierarchy::readChunkStates(int li, ValueField2D &valueField) {
+    assert(getPredictor().getHierarchy().getLayer(li)._sf->_type == _chunk);
+
+    valueField = ValueField2D(ogmaneo::Vec2i(getPredictor().getHierarchy().getLayer(li)._sf->getHiddenSize().x, getPredictor().getHierarchy().getLayer(li)._sf->getHiddenSize().y));
+
+    _resources->getComputeSystem()->getQueue().enqueueReadImage(getPredictor().getHierarchy().getLayer(li)._sf->getHiddenStates()[_back], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(getPredictor().getHierarchy().getLayer(li)._sf->getHiddenSize().x), static_cast<cl::size_type>(getPredictor().getHierarchy().getLayer(li)._sf->getHiddenSize().y), 1 }, 0, 0, valueField.getData().data());
 }

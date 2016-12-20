@@ -41,8 +41,8 @@ namespace ogmaneo {
             */
             VisibleLayerDesc()
                 : _size({ 16, 16 }),
-                _radius(8),
-                _alpha(0.04f)
+                _radius(10),
+                _alpha(0.1f)
             {}
 
             //!@{
@@ -92,10 +92,13 @@ namespace ogmaneo {
         */
         DoubleBuffer2D _hiddenSummationTemp;
 
+        //!@{
         /*!
         \brief Predictions
         */
         DoubleBuffer2D _hiddenStates;
+        DoubleBuffer2D _hiddenActivations;
+        //!@}
 
         /*!
         \brief
@@ -118,6 +121,7 @@ namespace ogmaneo {
         cl::Kernel _deriveInputsKernel;
         cl::Kernel _stimulusKernel;
         cl::Kernel _learnPredWeightsKernel;
+        cl::Kernel _thresholdKernel;
         //!@}
 
     public:
@@ -197,6 +201,13 @@ namespace ogmaneo {
         */
         cl_int2 getHiddenSize() const {
             return _hiddenSize;
+        }
+
+        /*!
+        \brief Get the hidden summation buffer
+        */
+        const DoubleBuffer2D &getHiddenSummation() const {
+            return _hiddenSummationTemp;
         }
 
         //!@{
