@@ -100,7 +100,7 @@ namespace ogmaneo {
         /*!
         \brief Learning
         */
-        virtual void learn(ComputeSystem &cs, std::mt19937 &rng) = 0;
+        virtual void learn(ComputeSystem &cs, const cl::Image2D &predictionsPrev, std::mt19937 &rng) = 0;
 
         /*!
         \brief Inhibition

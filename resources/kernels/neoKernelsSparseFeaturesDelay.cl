@@ -44,7 +44,7 @@ void kernel sfdStimulus(read_only image2d_t visibleStates,
             }
         }
 
-    write_imagef(hiddenSummationTempFront, hiddenPosition, (float4)(sum + subSum / fmax(0.0001f, sqrt(stateSum)), 0.0f, 0.0f, 0.0f));
+    write_imagef(hiddenSummationTempFront, hiddenPosition, (float4)(sum + subSum, 0.0f, 0.0f, 0.0f));
 }
 
 void kernel sfdActivate(read_only image2d_t stimuli, read_only image2d_t hiddenStates, read_only image2d_t biases,
@@ -127,7 +127,7 @@ void kernel sfdLearnWeights(read_only image2d_t hiddenStates, read_only image2d_
             }
         }
 		
-	float scale = 1.0f / fmax(0.0001f, sqrt(weightSum));
+	float scale = 1.0f / fmax(0.0001f, weightSum);
 	
     for (int dx = -radius; dx <= radius; dx++)
         for (int dy = -radius; dy <= radius; dy++) {

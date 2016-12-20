@@ -53,9 +53,10 @@ namespace ogmaneo {
     public:
         /*!
         \brief Create an OpenCL compute system with a given device type.
-        Optional: Create from a device index and an OpenGL context
+        Optional: Create from a platform index, device index, and an OpenGL context
+        Default: Use the last platform and last device discovered
         */
-        bool create(DeviceType type, unsigned int index = 0, bool createFromGLContext = false);
+        bool create(DeviceType type, int platformIndex = -1, int deviceIndex = -1, bool createFromGLContext = false);
 
         /*!
         \brief Get underlying OpenCL platform

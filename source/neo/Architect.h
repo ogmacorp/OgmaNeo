@@ -60,18 +60,18 @@ namespace ogmaneo {
     private:
         std::shared_ptr<ComputeSystem> _cs;
         std::unordered_map<std::string, std::shared_ptr<ComputeProgram>> _programs;
-    
+
     public:
         Resources()
         {}
 
-        Resources(ComputeSystem::DeviceType type, unsigned int index = 0) {
-            create(type, index);
+        Resources(ComputeSystem::DeviceType type, int platformIndex = -1, int deviceIndex = -1) {
+            create(type, platformIndex, deviceIndex);
         }
 
-        void create(ComputeSystem::DeviceType type, unsigned int index = 0) {
+        void create(ComputeSystem::DeviceType type, int platformIndex = -1, int deviceIndex = -1) {
             _cs = std::make_shared<ComputeSystem>();
-            _cs->create(type, index);
+            _cs->create(type, platformIndex, deviceIndex);
         }
 
         const std::shared_ptr<ComputeSystem> &getComputeSystem() const {
@@ -110,7 +110,7 @@ namespace ogmaneo {
             _data.clear();
             _data.assign(size.x * size.y, defVal);
         }
-        
+
         float getValue(const Vec2i &pos) const {
             return _data[pos.x + pos.y * _size.x];
         }
@@ -187,7 +187,7 @@ namespace ogmaneo {
 
         static Vec2i parseVec2i(const std::string &s) {
             std::istringstream is(s.substr(1, s.size() - 2)); // Remove ()
-            
+
             std::string xs;
             std::getline(is, xs, ',');
 
@@ -279,7 +279,7 @@ namespace ogmaneo {
         std::vector<InputLayer> _inputLayers;
         std::vector<ActionLayer> _actionLayers;
         std::vector<HigherLayer> _higherLayers;
-        
+
         std::mt19937 _rng;
 
         std::shared_ptr<SparseFeatures::SparseFeaturesDesc> sfDescFromName(

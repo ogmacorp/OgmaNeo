@@ -33,7 +33,7 @@ void Predictor::createRandom(ComputeSystem &cs, ComputeProgram &hProgram, Comput
         for (int p = 0; p < pVisibleLayerDescs.size(); p++) {
             // Current
             pVisibleLayerDescs[p]._radius = _pLayerDescs[l]._radius;
-            pVisibleLayerDescs[p]._alpha = p == 0 ? _pLayerDescs[l]._alpha : _pLayerDescs[l]._beta;
+            pVisibleLayerDescs[p]._alpha = (p == 0) ? _pLayerDescs[l]._alpha : _pLayerDescs[l]._beta;
             pVisibleLayerDescs[p]._size = _h.getLayer(l)._sf->getHiddenSize();
         }
 
@@ -84,14 +84,8 @@ schemas::PredLayerDesc Predictor::PredLayerDesc::save(flatbuffers::FlatBufferBui
 }
 
 void Predictor::load(const schemas::Predictor* fbPredictor, ComputeSystem &cs) {
-    if (!_pLayers.empty()) {
-        assert(_pLayerDescs.size() == fbPredictor->_pLayerDescs()->Length());
-        assert(_pLayers.size() == fbPredictor->_pLayers()->Length());
-    }
-    else {
-        _pLayerDescs.reserve(fbPredictor->_pLayerDescs()->Length());
-        _pLayers.reserve(fbPredictor->_pLayers()->Length());
-    }
+    assert(_pLayerDescs.size() == fbPredictor->_pLayerDescs()->Length());
+    assert(_pLayers.size() == fbPredictor->_pLayers()->Length());
 
     _h.load(fbPredictor->_h(), cs);
 

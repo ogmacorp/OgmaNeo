@@ -30,6 +30,7 @@ namespace ogmaneo {
         std::mt19937 _rng;
 
         std::vector<cl::Image2D> _inputImages;
+        std::vector<cl::Image2D> _corruptedInputImages;
 
         std::vector<ValueField2D> _actions;
 
@@ -50,6 +51,7 @@ namespace ogmaneo {
         \brief Run a single simulation tick
         */
         void simStep(float reward, std::vector<ValueField2D> &inputs, bool learn = true);
+        void simStep(float reward, std::vector<ValueField2D> &inputs, std::vector<ValueField2D> &corruptedInputs, bool learn = true);
 
         /*!
         \brief Get the action vector

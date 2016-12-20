@@ -10,14 +10,14 @@
 
 #include "system/SharedLib.h"
 #include "SparseFeatures.h"
-#include "schemas/SparseFeaturesSTDP_generated.h"
+#include "schemas/SparseFeaturesReLU_generated.h"
 
 namespace ogmaneo {
     /*!
-    \brief STDP encoder (sparse features)
+    \brief ReLU encoder (sparse features)
     Learns a sparse code that is then used to predict the next input. Can be used with multiple layers
     */
-    class OGMA_API SparseFeaturesSTDP : public SparseFeatures {
+    class OGMA_API SparseFeaturesReLU : public SparseFeatures {
     public:
         /*!
         \brief Visible layer desc
@@ -31,37 +31,50 @@ namespace ogmaneo {
             /*!
             \brief Radius onto input
             */
-            cl_int _radius;
+            cl_int _radiusHidden;
+
+            /*!
+            \brief Radius onto hidden
+            */
+            cl_int _radiusVisible;
 
             /*!
             \brief Whether or not the middle (center) input should be ignored (self in recurrent schemes)
             */
             unsigned char _ignoreMiddle;
 
+            //!@{
             /*!
-            \brief Learning rate
+            \brief Learning rates
             */
-            cl_float _weightAlpha;
+            cl_float _weightAlphaHidden;
+            cl_float _weightAlphaVisible;
+            //!@}
 
             /*!
-            \brief Input decay
+            \brief Short trace rate
             */
-            cl_float _lambda;
+            float _lambda;
+
+            /*!
+            \brief Whether this layer should be predicted
+            */
+            bool _predict;
 
             /*!
             \brief Initialize defaults
             */
             VisibleLayerDesc()
-                : _size({ 8, 8 }), _radius(10), _ignoreMiddle(false),
-                _weightAlpha(0.01f), _lambda(0.9f)
+                : _size({ 8, 8 }), _radiusHidden(8), _radiusVisible(8), _ignoreMiddle(false),
+                _weightAlphaHidden(0.005f), _weightAlphaVisible(0.05f), _lambda(0.8f), _predict(true)
             {}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::VisibleSTDPLayerDesc* fbVisibleSTDPLayerDesc, ComputeSystem &cs);
-            schemas::VisibleSTDPLayerDesc save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::VisibleReLULayerDesc* fbVisibleReLULayer, ComputeSystem &cs);
+            schemas::VisibleReLULayerDesc save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
@@ -75,9 +88,22 @@ namespace ogmaneo {
             DoubleBuffer2D _derivedInput;
 
             /*!
+            \brief Predictions
+            */
+            DoubleBuffer2D _predictions;
+
+            /*!
+            \brief Samples (time sliced derived inputs)
+            */
+            DoubleBuffer3D _samples;
+
+            //!@{
+            /*!
             \brief Weights
             */
-            DoubleBuffer3D _weights; // Encoding weights (creates spatio-temporal sparse code)
+            DoubleBuffer3D _weightsHidden;
+            DoubleBuffer3D _weightsVisible;
+            //!@}
 
             //!@{
             /*!
@@ -86,35 +112,37 @@ namespace ogmaneo {
             cl_float2 _hiddenToVisible;
             cl_float2 _visibleToHidden;
 
-            cl_int2 _reverseRadii;
+            cl_int2 _reverseRadiiHidden;
+            cl_int2 _reverseRadiiVisible;
             //!@}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::VisibleSTDPLayer* fbVisibleSTDPLayer, ComputeSystem &cs);
-            flatbuffers::Offset<schemas::VisibleSTDPLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::VisibleReLULayer* fbVisibleReLULayer, ComputeSystem &cs);
+            flatbuffers::Offset<schemas::VisibleReLULayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
         /*!
-        \brief Sparse Features Chunk Descriptor
+        \brief Sparse Features ReLU Descriptor
         */
-        class OGMA_API SparseFeaturesSTDPDesc : public SparseFeatures::SparseFeaturesDesc {
+        class OGMA_API SparseFeaturesReLUDesc : public SparseFeatures::SparseFeaturesDesc {
         public:
             //!@{
             /*!
             \brief Construction information
             */
             std::shared_ptr<ComputeSystem> _cs;
-            std::shared_ptr<ComputeProgram> _sfcProgram;
+            std::shared_ptr<ComputeProgram> _sfrProgram;
             std::vector<VisibleLayerDesc> _visibleLayerDescs;
             cl_int2 _hiddenSize;
-            cl_int _inhibitionRadius;
-            cl_float _biasAlpha;
-            cl_float _activeRatio;
+            int _numSamples;
+            cl_int _lateralRadius;
             cl_float _gamma;
+            cl_float _activeRatio;
+            cl_float _biasAlpha;
             cl_float2 _initWeightRange;
             std::mt19937 _rng;
             //!@}
@@ -122,14 +150,14 @@ namespace ogmaneo {
             /*!
             \brief Defaults
             */
-            SparseFeaturesSTDPDesc()
+            SparseFeaturesReLUDesc()
                 : _hiddenSize({ 16, 16 }),
-                _inhibitionRadius(6),
-                _biasAlpha(0.01f), _activeRatio(0.01f), _gamma(0.96f),
+                _numSamples(1), _lateralRadius(6),
+                _gamma(0.92f), _activeRatio(0.02f), _biasAlpha(0.005f),
                 _initWeightRange({ -0.01f, 0.01f }),
                 _rng()
             {
-                _name = "STDP";
+                _name = "ReLU";
             }
 
             size_t getNumVisibleLayers() const override {
@@ -148,24 +176,23 @@ namespace ogmaneo {
             \brief Factory
             */
             std::shared_ptr<SparseFeatures> sparseFeaturesFactory() override {
-                return std::make_shared<SparseFeaturesSTDP>(*_cs, *_sfcProgram, _visibleLayerDescs, _hiddenSize, _inhibitionRadius, _biasAlpha, _activeRatio, _gamma, _initWeightRange, _rng);
+                return std::make_shared<SparseFeaturesReLU>(*_cs, *_sfrProgram, _visibleLayerDescs, _hiddenSize, _numSamples, _lateralRadius, _gamma, _activeRatio, _biasAlpha, _initWeightRange, _rng);
             }
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::SparseFeaturesSTDPDesc* fbSparseFeaturesSTDPDesc, ComputeSystem &cs);
-            flatbuffers::Offset<schemas::SparseFeaturesSTDPDesc> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::SparseFeaturesReLUDesc* fbSparseFeaturesReLUDesc, ComputeSystem &cs);
+            flatbuffers::Offset<schemas::SparseFeaturesReLUDesc> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
     private:
         //!@{
         /*!
-        \brief Activations, states, biases
+        \brief Hidden states, biases
         */
-        DoubleBuffer2D _hiddenActivations;
         DoubleBuffer2D _hiddenStates;
         DoubleBuffer2D _hiddenBiases;
         //!@}
@@ -174,11 +201,6 @@ namespace ogmaneo {
         \brief Hidden size
         */
         cl_int2 _hiddenSize;
-
-        /*!
-        \brief Inhibition radius
-        */
-        cl_int _inhibitionRadius;
 
         /*!
         \brief Hidden summation temporary buffer
@@ -197,11 +219,14 @@ namespace ogmaneo {
         /*!
         \brief Kernels
         */
+        cl::Kernel _addSampleKernel;
         cl::Kernel _stimulusKernel;
-        cl::Kernel _activateKernel;
         cl::Kernel _inhibitKernel;
+        cl::Kernel _predictKernel;
         cl::Kernel _inhibitOtherKernel;
-        cl::Kernel _learnWeightsKernel;
+        cl::Kernel _errorPropKernel;
+        cl::Kernel _learnWeightsHiddenKernel;
+        cl::Kernel _learnWeightsVisibleKernel;
         cl::Kernel _learnBiasesKernel;
         cl::Kernel _deriveInputsKernel;
         //!@}
@@ -211,15 +236,17 @@ namespace ogmaneo {
         /*!
         \brief Additional parameters
         */
-        cl_float _biasAlpha;
-        cl_float _activeRatio;
-        cl_float _gamma;
+        int _numSamples;
+        int _lateralRadius;
+        float _gamma;
+        float _activeRatio;
+        float _biasAlpha;
         //!@}
 
         /*!
         \brief Default constructor
         */
-        SparseFeaturesSTDP() {};
+        SparseFeaturesReLU() {};
 
         /*!
         \brief Create a comparison sparse coder with random initialization
@@ -228,12 +255,10 @@ namespace ogmaneo {
         \param hiddenSize hidden layer (SDR) size (2D).
         \param rng a random number generator.
         */
-        SparseFeaturesSTDP(ComputeSystem &cs, ComputeProgram &sfhProgram,
-            const std::vector<VisibleLayerDesc> &visibleLayerDescs,
-            cl_int2 hiddenSize, cl_int inhibitionRadius,
-            cl_float biasAlpha,
-            cl_float activeRatio,
-            cl_float gamma,
+        SparseFeaturesReLU(ComputeSystem &cs, ComputeProgram &sfrProgram,
+            const std::vector<VisibleLayerDesc> &visibleLayerDescs, cl_int2 hiddenSize,
+            int numSamples, int lateralRadius,
+            cl_float gamma, cl_float activeRatio, cl_float biasAlpha,
             cl_float2 initWeightRange,
             std::mt19937 &rng);
 
@@ -300,10 +325,10 @@ namespace ogmaneo {
         }
 
         /*!
-        \brief Get hidden activations
+        \brief Get hidden states
         */
-        const DoubleBuffer2D &getHiddenActivations() const {
-            return _hiddenActivations;
+        const cl::Image2D &getHiddenContext() const override {
+            return _hiddenStates[_back];
         }
 
         /*!

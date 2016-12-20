@@ -171,7 +171,7 @@ void SparseFeaturesDelay::stepEnd(ComputeSystem &cs) {
     }
 }
 
-void SparseFeaturesDelay::learn(ComputeSystem &cs, std::mt19937 &rng) {
+void SparseFeaturesDelay::learn(ComputeSystem &cs, const cl::Image2D &predictionsPrev, std::mt19937 &rng) {
     // Learn weights
     for (int vli = 0; vli < _visibleLayers.size(); vli++) {
         VisibleLayer &vl = _visibleLayers[vli];
@@ -285,16 +285,11 @@ flatbuffers::Offset<schemas::VisibleDelayLayer> SparseFeaturesDelay::VisibleLaye
 }
 
 void SparseFeaturesDelay::SparseFeaturesDelayDesc::load(const schemas::SparseFeaturesDelayDesc* fbSparseFeaturesDelayDesc, ComputeSystem &cs) {
-    if (!_visibleLayerDescs.empty()) {
-        assert(_hiddenSize.x == fbSparseFeaturesDelayDesc->_hiddenSize()->x());
-        assert(_hiddenSize.y == fbSparseFeaturesDelayDesc->_hiddenSize()->y());
-        assert(_visibleLayerDescs.size() == fbSparseFeaturesDelayDesc->_visibleLayerDescs()->Length());
-    }
-    else {
-        _hiddenSize = cl_int2{ fbSparseFeaturesDelayDesc->_hiddenSize()->x(), fbSparseFeaturesDelayDesc->_hiddenSize()->y() };
-        _visibleLayerDescs.reserve(fbSparseFeaturesDelayDesc->_visibleLayerDescs()->Length());
-    }
+    assert(_hiddenSize.x == fbSparseFeaturesDelayDesc->_hiddenSize()->x());
+    assert(_hiddenSize.y == fbSparseFeaturesDelayDesc->_hiddenSize()->y());
+    assert(_visibleLayerDescs.size() == fbSparseFeaturesDelayDesc->_visibleLayerDescs()->Length());
 
+    _hiddenSize = cl_int2{ fbSparseFeaturesDelayDesc->_hiddenSize()->x(), fbSparseFeaturesDelayDesc->_hiddenSize()->y() };
     _inhibitionRadius = fbSparseFeaturesDelayDesc->_inhibitionRadius();
     _biasAlpha = fbSparseFeaturesDelayDesc->_biasAlpha();
     _activeRatio = fbSparseFeaturesDelayDesc->_activeRatio();
@@ -323,24 +318,18 @@ void SparseFeaturesDelay::load(const schemas::SparseFeatures* fbSparseFeatures, 
     schemas::SparseFeaturesDelay* fbSparseFeaturesDelay =
         (schemas::SparseFeaturesDelay*)(fbSparseFeatures->_sf());
 
-    if (!_visibleLayers.empty()) {
-        assert(_hiddenSize.x == fbSparseFeaturesDelay->_hiddenSize()->x());
-        assert(_hiddenSize.y == fbSparseFeaturesDelay->_hiddenSize()->y());
-        assert(_visibleLayerDescs.size() == fbSparseFeaturesDelay->_visibleLayerDescs()->Length());
-        assert(_visibleLayers.size() == fbSparseFeaturesDelay->_visibleLayers()->Length());
-    }
-    else {
-        _hiddenSize.x = fbSparseFeaturesDelay->_hiddenSize()->x();
-        _hiddenSize.y = fbSparseFeaturesDelay->_hiddenSize()->y();
-        _visibleLayerDescs.reserve(fbSparseFeaturesDelay->_visibleLayerDescs()->Length());
-        _visibleLayers.reserve(fbSparseFeaturesDelay->_visibleLayers()->Length());
-    }
-    ogmaneo::load(_hiddenActivations, fbSparseFeaturesDelay->_hiddenActivations(), cs);
-    ogmaneo::load(_hiddenStates, fbSparseFeaturesDelay->_hiddenStates(), cs);
-    ogmaneo::load(_hiddenBiases, fbSparseFeaturesDelay->_hiddenBiases(), cs);
+    assert(_hiddenSize.x == fbSparseFeaturesDelay->_hiddenSize()->x());
+    assert(_hiddenSize.y == fbSparseFeaturesDelay->_hiddenSize()->y());
+    assert(_visibleLayerDescs.size() == fbSparseFeaturesDelay->_visibleLayerDescs()->Length());
+    assert(_visibleLayers.size() == fbSparseFeaturesDelay->_visibleLayers()->Length());
+  
+    _hiddenSize = cl_int2{ fbSparseFeaturesDelay->_hiddenSize()->x(), fbSparseFeaturesDelay->_hiddenSize()->y() };
 
     _inhibitionRadius = fbSparseFeaturesDelay->_inhibitionRadius();
 
+    ogmaneo::load(_hiddenActivations, fbSparseFeaturesDelay->_hiddenActivations(), cs);
+    ogmaneo::load(_hiddenStates, fbSparseFeaturesDelay->_hiddenStates(), cs);
+    ogmaneo::load(_hiddenBiases, fbSparseFeaturesDelay->_hiddenBiases(), cs);
     ogmaneo::load(_hiddenSummationTemp, fbSparseFeaturesDelay->_hiddenSummationTemp(), cs);
 
     for (flatbuffers::uoffset_t i = 0; i < fbSparseFeaturesDelay->_visibleLayerDescs()->Length(); i++) {
