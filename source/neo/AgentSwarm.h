@@ -33,20 +33,23 @@ namespace ogmaneo {
             \brief Q learning parameters
             */
             cl_float _qAlpha;
-            cl_float _actionAlpha;
             cl_float _qGamma;
             cl_float _qLambda;
-            cl_float _actionLambda;
-            cl_float _maxActionWeightMag;
+            cl_float _epsilon;
+
+            cl_int2 _chunkSize;
+            cl_float _chunkGamma;
             //!@}
 
             /*!
             \brief Initialize defaults
             */
             AgentLayerDesc()
-                : _radius(12), _qAlpha(0.01f), _actionAlpha(0.1f),
-                _qGamma(0.99f), _qLambda(0.98f), _actionLambda(0.98f),
-                _maxActionWeightMag(10.0f)
+                : _radius(12), _qAlpha(0.1f),
+                _qGamma(0.99f), _qLambda(0.98f),
+                _epsilon(0.08f),
+                _chunkSize({ 8, 8 }),
+                _chunkGamma(0.5f)
             {}
 
             //!@{
@@ -147,7 +150,7 @@ namespace ogmaneo {
         To get continuous values, divide each tile index by the number of elements in a tile (actionTileSize.x * actionTileSize.y).
         */
         const cl::Image2D &getAction(int index) const {
-            return _aLayers.back()[index].getActions()[_back];
+            return _aLayers.front()[index].getActions()[_back];
         }
 
         /*!

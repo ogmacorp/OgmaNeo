@@ -20,6 +20,7 @@ struct VisibleChunkLayerDesc {
 
 table VisibleChunkLayer {
 	_derivedInput:DoubleBuffer2D;
+	_samples:DoubleBuffer3D;
 	_weights:DoubleBuffer3D;
 	_hiddenToVisible:float2;
 	_visibleToHidden:float2;
@@ -29,22 +30,17 @@ table VisibleChunkLayer {
 table SparseFeaturesChunkDesc {
 	_hiddenSize:int2;
     _chunkSize:int2;
-    _biasAlpha:float;
-    _gamma:float;
 	_initWeightRange:float2;
 	_visibleLayerDescs:[VisibleChunkLayerDesc];
 }
 
 table SparseFeaturesChunk {
     _hiddenStates:DoubleBuffer2D;
-    _hiddenBiases:DoubleBuffer2D;
-    _chunkWinners:Image2D;
+    _hiddenActivations:DoubleBuffer2D;
+    _chunkWinners:DoubleBuffer2D;
     _hiddenSize:int2;
-    _chunkToHidden:float2;
     _chunkSize:int2;
     _hiddenSummationTemp:DoubleBuffer2D;
-    _biasAlpha:float;
-    _gamma:float;
     _visibleLayerDescs:[VisibleChunkLayerDesc];
     _visibleLayers:[VisibleChunkLayer];
 }

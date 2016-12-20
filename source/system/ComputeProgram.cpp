@@ -21,6 +21,7 @@
 #include "kernels/neoKernelsSparseFeaturesChunk.h"
 #include "kernels/neoKernelsSparseFeaturesDelay.h"
 #include "kernels/neoKernelsSparseFeaturesSTDP.h"
+#include "kernels/neoKernelsSparseFeaturesReLU.h"
 
 using namespace ogmaneo;
 
@@ -77,6 +78,13 @@ bool ComputeProgram::loadSparseFeaturesKernel(ComputeSystem &cs, SparseFeaturesT
     case _chunk:
         kernel = std::accumulate(
             neoKernelsSparseFeaturesChunk_ocl, neoKernelsSparseFeaturesChunk_ocl + sizeof(neoKernelsSparseFeaturesChunk_ocl) / sizeof(neoKernelsSparseFeaturesChunk_ocl[0]),
+            std::string(""));
+
+        break;
+
+    case _ReLU:
+        kernel = std::accumulate(
+            neoKernelsSparseFeaturesReLU_ocl, neoKernelsSparseFeaturesReLU_ocl + sizeof(neoKernelsSparseFeaturesReLU_ocl) / sizeof(neoKernelsSparseFeaturesReLU_ocl[0]),
             std::string(""));
 
         break;

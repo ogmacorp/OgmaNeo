@@ -53,8 +53,6 @@ The simplest usage of the predictive hierarchy involves calling:
         .setValue("sfc_chunkSize", ogmaneo::Vec2i(6, 6))
         .setValue("sfc_ff_radius", 12)
         .setValue("hl_poolSteps", 2)
-        .setValue("sfc_weightAlpha", 0.02f)
-        .setValue("sfc_biasAlpha", 0.001f)
         .setValue("p_alpha", 0.08f)
         .setValue("p_beta", 0.16f)
         .setValue("p_radius", 12);
@@ -95,8 +93,6 @@ Parameters are adjusted by performing value changes on the parameter modifier re
         .setValue("sfc_chunkSize", ogmaneo::Vec2i(6, 6))
         .setValue("sfc_ff_radius", 12)
         .setValue("hl_poolSteps", 2)
-        .setValue("sfc_weightAlpha", 0.02f)
-        .setValue("sfc_biasAlpha", 0.001f)
         .setValue("p_alpha", 0.08f)
         .setValue("p_beta", 0.16f)
         .setValue("p_radius", 12);
@@ -122,10 +118,11 @@ Input layers (prefix 'in'):
 Agent layers (prefix 'a'):
  - a_radius (int): Input field radius (onto previous action layer).
  - a_qAlpha (float): Q learning rate.
- - a_actionAlpha (float): Action learning rate.
  - a_qGamma (float): Q gamma (discount factor).
  - a_qLambda (float): Q lambda (trace decay factor).
- - a_actionLambda (float): Action lambda (trace decay factor).
+ - a_epsilon (float): Random threshold for action exploration.
+ - a_chunkSize (int, int): Size of a chunk.
+ - a_chunkGamma (float): Falloff (higher means faster) for SOM neighborhood radius.
 
 ### Encoders
 
@@ -159,8 +156,6 @@ Sparse features Chunk (prefix 'sfc'):
  - sfc_chunkSize (int, int): Size of a chunk.
  - sfc_initWeightRange (float, float): Weight initialization range.
  - sfc_numSamples (int): Number of temporally extended samples (1 means no additional samples).
- - sfc_biasAlpha (float): Bias learning rate.
- - sfc_activeRatio (float): Ratio of active units (inverse of sparsity).
  - sfc_gamma (float): Falloff (higher means faster) for SOM neighborhood radius.
  - Feed forward inputs (prefix 'ff'):
     - sfc_ff_radius (int): Radius onto feed forward inputs.
@@ -169,7 +164,27 @@ Sparse features Chunk (prefix 'sfc'):
  - Recurrent inputs (prefix 'r'):
     - sfc_r_radius (int): Radius onto recurrent inputs.
     - sfc_r_weightAlpha (float): Learning rate for recurrent inputs.
-    - sfc_r_lambda (float): Input trace decay for recurrent inputs. 
+    - sfc_r_lambda (float): Input trace decay for recurrent inputs.
+
+Sparse features ReLU (prefix 'sfr')
+ - sfr_initWeightRange (float, float): Weight initialization range.
+ - sfr_numSamples (int): Number of temporally extended samples (1 means no additional samples).
+ - sfr_lateralRadius (int): Inhibitory (lateral) radius.
+ - sfr_gamma (float): State trace decay (used for temporal sparsity management).
+ - sfr_activeRatio (float): Ratio of active units (inverse of sparsity).
+ - sfr_biasAlpha (float): Learning rate of hidden unit biases (for maintaining sparsity).
+ - Feed forward (prefix 'ff'):  
+    - sfr_ff_radius_hidden (int): Radius onto feed forward oututs.
+    - sfr_ff_radius_visible (int): Radius onto feed forward inputs.
+    - sfr_ff_weightAlpha_hidden (float): Learning rate for feed forward outputs.
+    - sfr_ff_weightAlpha_visible (float): Learning rate for feed forward inputs.
+    - sfr_ff_lambda (float): Input trace decay for feed forward inputs.  
+ - Recurrent (prefix 'r'):
+    - sfr_r_radius_hidden (int): Radius onto recurrent outputs.
+    - sfr_r_radius_visible (int): Radius onto recurrent inputs.
+    - sfr_r_weightAlpha_hidden (float): Learning rate for recurrent outputs.
+    - sfr_r_weightAlpha_visible (float): Learning rate for recurrent inputs.
+    - sfr_r_lambda (float): Input trace decay for recurrent inputs.
 
 ## Requirements
 

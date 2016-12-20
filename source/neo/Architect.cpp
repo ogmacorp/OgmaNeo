@@ -15,6 +15,7 @@
 #include "SparseFeaturesChunk.h"
 #include "SparseFeaturesDelay.h"
 #include "SparseFeaturesSTDP.h"
+#include "SparseFeaturesReLU.h"
 
 #include <iostream>
 
@@ -77,11 +78,13 @@ std::shared_ptr<class Hierarchy> Architect::generateHierarchy(std::unordered_map
     h->_resources = _resources;
 
     h->_inputImages.resize(_inputLayers.size());
+    h->_corruptedInputImages.resize(_inputLayers.size());
 
     std::vector<bool> shouldPredict(_inputLayers.size());
 
     for (int i = 0; i < _inputLayers.size(); i++) {
         h->_inputImages[i] = cl::Image2D(_resources->_cs->getContext(), CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), _inputLayers[i]._size.x, _inputLayers[i]._size.y);
+        h->_corruptedInputImages[i] = cl::Image2D(_resources->_cs->getContext(), CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), _inputLayers[i]._size.x, _inputLayers[i]._size.y);
 
         /*if (_inputLayers[i]._params.find("in_predict") != _inputLayers[i]._params.end()) {
         if (_inputLayers[i]._params["in_predict"] == ParameterModifier::_boolTrue) {
@@ -240,7 +243,7 @@ std::shared_ptr<class Agent> Architect::generateAgent(std::unordered_map<std::st
             pLayerDescs[l]._radius = std::stoi(_higherLayers[l]._params["p_radius"]);
 
         // A layer desc
-        if (l == _higherLayers.size() - 1) {
+        if (l == 0) {
             aLayerDescs[l].resize(_actionLayers.size());
 
             for (int i = 0; i < _actionLayers.size(); i++) {
@@ -250,17 +253,22 @@ std::shared_ptr<class Agent> Architect::generateAgent(std::unordered_map<std::st
                 if (_actionLayers[i]._params.find("a_qAlpha") != _actionLayers[i]._params.end())
                     aLayerDescs[l][i]._qAlpha = std::stof(_actionLayers[i]._params["a_qAlpha"]);
 
-                if (_actionLayers[i]._params.find("a_actionAlpha") != _actionLayers[i]._params.end())
-                    aLayerDescs[l][i]._actionAlpha = std::stof(_actionLayers[i]._params["a_actionAlpha"]);
-
                 if (_actionLayers[i]._params.find("a_qGamma") != _actionLayers[i]._params.end())
                     aLayerDescs[l][i]._qGamma = std::stof(_actionLayers[i]._params["a_qGamma"]);
 
                 if (_actionLayers[i]._params.find("a_qLambda") != _actionLayers[i]._params.end())
                     aLayerDescs[l][i]._qLambda = std::stof(_actionLayers[i]._params["a_qLambda"]);
 
-                if (_actionLayers[i]._params.find("a_actionLambda") != _actionLayers[i]._params.end())
-                    aLayerDescs[l][i]._actionLambda = std::stof(_actionLayers[i]._params["a_actionLambda"]);
+                if (_actionLayers[i]._params.find("a_epsilon") != _actionLayers[i]._params.end())
+                    aLayerDescs[l][i]._epsilon = std::stof(_actionLayers[i]._params["a_epsilon"]);
+
+                if (_actionLayers[i]._params.find("a_chunkSize") != _actionLayers[i]._params.end()) {
+                    Vec2i chunkSize = ParameterModifier::parseVec2i(_actionLayers[i]._params["a_chunkSize"]);
+                    aLayerDescs[l][i]._chunkSize = { chunkSize.x, chunkSize.y };
+                }
+
+                if (_actionLayers[i]._params.find("a_chunkGamma") != _actionLayers[i]._params.end())
+                    aLayerDescs[l][i]._chunkGamma = std::stof(_actionLayers[i]._params["a_chunkGamma"]);
             }
         }
         else {
@@ -272,17 +280,22 @@ std::shared_ptr<class Agent> Architect::generateAgent(std::unordered_map<std::st
             if (_higherLayers[l]._params.find("a_qAlpha") != _higherLayers[l]._params.end())
                 aLayerDescs[l].front()._qAlpha = std::stof(_higherLayers[l]._params["a_qAlpha"]);
 
-            if (_higherLayers[l]._params.find("a_actionAlpha") != _higherLayers[l]._params.end())
-                aLayerDescs[l].front()._actionAlpha = std::stof(_higherLayers[l]._params["a_actionAlpha"]);
-
             if (_higherLayers[l]._params.find("a_qGamma") != _higherLayers[l]._params.end())
                 aLayerDescs[l].front()._qGamma = std::stof(_higherLayers[l]._params["a_qGamma"]);
 
             if (_higherLayers[l]._params.find("a_qLambda") != _higherLayers[l]._params.end())
                 aLayerDescs[l].front()._qLambda = std::stof(_higherLayers[l]._params["a_qLambda"]);
 
-            if (_higherLayers[l]._params.find("a_actionLambda") != _higherLayers[l]._params.end())
-                aLayerDescs[l].front()._actionLambda = std::stof(_higherLayers[l]._params["a_actionLambda"]);
+            if (_higherLayers[l]._params.find("a_epsilon") != _higherLayers[l]._params.end())
+                aLayerDescs[l].front()._epsilon = std::stof(_higherLayers[l]._params["a_epsilon"]);
+
+            if (_higherLayers[l]._params.find("a_chunkSize") != _higherLayers[l]._params.end()) {
+                Vec2i chunkSize = ParameterModifier::parseVec2i(_higherLayers[l]._params["a_chunkSize"]);
+                aLayerDescs[l].front()._chunkSize = { chunkSize.x, chunkSize.y };
+            }
+
+            if (_higherLayers[l]._params.find("a_chunkGamma") != _higherLayers[l]._params.end())
+                aLayerDescs[l].front()._chunkGamma = std::stof(_higherLayers[l]._params["a_chunkGamma"]);
         }
     }
 
@@ -489,7 +502,7 @@ std::shared_ptr<SparseFeatures::SparseFeaturesDesc> Architect::sfDescFromName(in
         std::shared_ptr<SparseFeaturesChunk::SparseFeaturesChunkDesc> sfDescChunk = std::make_shared<SparseFeaturesChunk::SparseFeaturesChunkDesc>();
 
         sfDescChunk->_cs = _resources->_cs;
-        sfDescChunk->_inputType = SparseFeatures::_feedForwardRecurrent;
+        sfDescChunk->_inputType = SparseFeatures::_feedForward;
         sfDescChunk->_hiddenSize = { size.x, size.y };
         sfDescChunk->_rng = _rng;
 
@@ -514,14 +527,8 @@ std::shared_ptr<SparseFeatures::SparseFeaturesDesc> Architect::sfDescFromName(in
         if (params.find("sfc_numSamples") != params.end())
             sfDescChunk->_numSamples = std::stoi(params["sfc_numSamples"]);
 
-        if (params.find("sfc_biasAlpha") != params.end())
-            sfDescChunk->_biasAlpha = std::stof(params["sfc_biasAlpha"]);
-
-        if (params.find("sfc_gamma") != params.end())
-            sfDescChunk->_gamma = std::stof(params["sfc_gamma"]);
-
         if (layerIndex == 0) {
-            sfDescChunk->_visibleLayerDescs.resize(_inputLayers.size() + 1);
+            sfDescChunk->_visibleLayerDescs.resize(_inputLayers.size());
 
             for (int i = 0; i < _inputLayers.size(); i++) {
                 sfDescChunk->_visibleLayerDescs[i]._ignoreMiddle = false;
@@ -539,7 +546,7 @@ std::shared_ptr<SparseFeatures::SparseFeaturesDesc> Architect::sfDescFromName(in
             }
 
             // Recurrent
-            {
+            /*{
                 sfDescChunk->_visibleLayerDescs.back()._ignoreMiddle = true;
 
                 sfDescChunk->_visibleLayerDescs.back()._size = { _higherLayers[layerIndex]._size.x, _higherLayers[layerIndex]._size.y };
@@ -552,10 +559,10 @@ std::shared_ptr<SparseFeatures::SparseFeaturesDesc> Architect::sfDescFromName(in
 
                 if (params.find("sfc_r_lambda") != params.end())
                     sfDescChunk->_visibleLayerDescs.back()._lambda = std::stof(params["sfc_r_lambda"]);
-            }
+            }*/
         }
         else {
-            sfDescChunk->_visibleLayerDescs.resize(2);
+            sfDescChunk->_visibleLayerDescs.resize(1);
 
             // Feed forward
             {
@@ -574,7 +581,7 @@ std::shared_ptr<SparseFeatures::SparseFeaturesDesc> Architect::sfDescFromName(in
             }
 
             // Recurrent
-            {
+            /*{
                 sfDescChunk->_visibleLayerDescs[1]._ignoreMiddle = true;
 
                 sfDescChunk->_visibleLayerDescs[1]._size = { _higherLayers[layerIndex]._size.x, _higherLayers[layerIndex]._size.y };
@@ -587,10 +594,153 @@ std::shared_ptr<SparseFeatures::SparseFeaturesDesc> Architect::sfDescFromName(in
 
                 if (params.find("sfc_r_lambda") != params.end())
                     sfDescChunk->_visibleLayerDescs[1]._lambda = std::stof(params["sfc_r_lambda"]);
-            }
+            }*/
         }
 
         sfDesc = sfDescChunk;
+
+        break;
+    }
+    case _ReLU:
+    {
+        std::shared_ptr<SparseFeaturesReLU::SparseFeaturesReLUDesc> sfDescReLU = std::make_shared<SparseFeaturesReLU::SparseFeaturesReLUDesc>();
+
+        sfDescReLU->_cs = _resources->_cs;
+        sfDescReLU->_inputType = SparseFeatures::_feedForwardRecurrent;
+        sfDescReLU->_hiddenSize = { size.x, size.y };
+        sfDescReLU->_rng = _rng;
+
+        if (params.find("sfr_initWeightRange") != params.end()) {
+            Vec2f initWeightRange = ParameterModifier::parseVec2f(params["sfr_initWeightRange"]);
+            sfDescReLU->_initWeightRange = { initWeightRange.x, initWeightRange.y };
+        }
+
+        if (_resources->_programs.find("ReLU") == _resources->_programs.end()) {
+            _resources->_programs["ReLU"] = sfDescReLU->_sfrProgram = std::make_shared<ComputeProgram>();
+
+            sfDescReLU->_sfrProgram->loadSparseFeaturesKernel(*_resources->_cs, _ReLU);
+        }
+        else
+            sfDescReLU->_sfrProgram = _resources->_programs["ReLU"];
+
+        if (params.find("sfr_numSamples") != params.end())
+            sfDescReLU->_numSamples = std::stoi(params["sfr_numSamples"]);
+
+        if (params.find("sfr_lateralRadius") != params.end())
+            sfDescReLU->_lateralRadius = std::stoi(params["sfr_lateralRadius"]);
+
+        if (params.find("sfr_gamma") != params.end())
+            sfDescReLU->_gamma = std::stof(params["sfr_gamma"]);
+
+        if (params.find("sfr_activeRatio") != params.end())
+            sfDescReLU->_activeRatio = std::stof(params["sfr_activeRatio"]);
+
+        if (params.find("sfr_biasAlpha") != params.end())
+            sfDescReLU->_biasAlpha = std::stof(params["sfr_biasAlpha"]);
+
+        if (layerIndex == 0) {
+            sfDescReLU->_visibleLayerDescs.resize(_inputLayers.size() + 1);
+
+            for (int i = 0; i < _inputLayers.size(); i++) {
+                sfDescReLU->_visibleLayerDescs[i]._ignoreMiddle = false;
+
+                sfDescReLU->_visibleLayerDescs[i]._predict = true;
+
+                sfDescReLU->_visibleLayerDescs[i]._size = { _inputLayers[i]._size.x, _inputLayers[i]._size.y };
+
+                if (_inputLayers[i]._params.find("sfr_ff_radius_hidden") != _inputLayers[i]._params.end())
+                    sfDescReLU->_visibleLayerDescs[i]._radiusHidden = std::stoi(_inputLayers[i]._params["sfr_ff_radius_hidden"]);
+
+                if (_inputLayers[i]._params.find("sfr_ff_radius_visible") != _inputLayers[i]._params.end())
+                    sfDescReLU->_visibleLayerDescs[i]._radiusVisible = std::stoi(_inputLayers[i]._params["sfr_ff_radius_visible"]);
+
+                if (_inputLayers[i]._params.find("sfr_ff_weightAlpha_hidden") != _inputLayers[i]._params.end())
+                    sfDescReLU->_visibleLayerDescs[i]._weightAlphaHidden = std::stof(_inputLayers[i]._params["sfr_ff_weightAlpha_hidden"]);
+
+                if (_inputLayers[i]._params.find("sfr_ff_weightAlpha_visible") != _inputLayers[i]._params.end())
+                    sfDescReLU->_visibleLayerDescs[i]._weightAlphaVisible = std::stof(_inputLayers[i]._params["sfr_ff_weightAlpha_visible"]);
+
+                if (_inputLayers[i]._params.find("sfr_ff_lambda") != _inputLayers[i]._params.end())
+                    sfDescReLU->_visibleLayerDescs[i]._lambda = std::stof(_inputLayers[i]._params["sfr_ff_lambda"]);
+            }
+
+            // Recurrent
+            {
+                sfDescReLU->_visibleLayerDescs.back()._ignoreMiddle = true;
+
+                sfDescReLU->_visibleLayerDescs.back()._predict = false;
+
+                sfDescReLU->_visibleLayerDescs.back()._size = { _higherLayers[layerIndex]._size.x, _higherLayers[layerIndex]._size.y };
+
+                if (params.find("sfr_r_radius_hidden") != params.end())
+                    sfDescReLU->_visibleLayerDescs.back()._radiusHidden = std::stoi(params["sfr_r_radius_hidden"]);
+
+                if (params.find("sfr_r_radius_visible") != params.end())
+                    sfDescReLU->_visibleLayerDescs.back()._radiusVisible = std::stoi(params["sfr_r_radius_visible"]);
+
+                if (params.find("sfr_r_weightAlpha_hidden") != params.end())
+                    sfDescReLU->_visibleLayerDescs.back()._weightAlphaHidden = std::stof(params["sfr_r_weightAlpha_hidden"]);
+
+                if (params.find("sfr_r_weightAlpha_visible") != params.end())
+                    sfDescReLU->_visibleLayerDescs.back()._weightAlphaVisible = std::stof(params["sfr_r_weightAlpha_visible"]);
+
+                if (params.find("sfr_r_lambda") != params.end())
+                    sfDescReLU->_visibleLayerDescs.back()._lambda = std::stof(params["sfr_r_lambda"]);
+            }
+        }
+        else {
+            sfDescReLU->_visibleLayerDescs.resize(2);
+
+            // Feed forward
+            {
+                sfDescReLU->_visibleLayerDescs[0]._ignoreMiddle = false;
+
+                sfDescReLU->_visibleLayerDescs[0]._predict = true;
+
+                sfDescReLU->_visibleLayerDescs[0]._size = { _higherLayers[layerIndex - 1]._size.x, _higherLayers[layerIndex - 1]._size.y };
+
+                if (params.find("sfr_ff_radius_hidden") != params.end())
+                    sfDescReLU->_visibleLayerDescs[0]._radiusHidden = std::stoi(params["sfr_ff_radius_hidden"]);
+
+                if (params.find("sfr_ff_radius_visible") != params.end())
+                    sfDescReLU->_visibleLayerDescs[0]._radiusVisible = std::stoi(params["sfr_ff_radius_visible"]);
+
+                if (params.find("sfr_ff_weightAlpha_hidden") != params.end())
+                    sfDescReLU->_visibleLayerDescs[0]._weightAlphaHidden = std::stof(params["sfr_ff_weightAlpha_hidden"]);
+
+                if (params.find("sfr_ff_weightAlpha_visible") != params.end())
+                    sfDescReLU->_visibleLayerDescs[0]._weightAlphaVisible = std::stof(params["sfr_ff_weightAlpha_visible"]);
+
+                if (params.find("sfr_ff_lambda") != params.end())
+                    sfDescReLU->_visibleLayerDescs[0]._lambda = std::stof(params["sfr_ff_lambda"]);
+            }
+
+            // Recurrent
+            {
+                sfDescReLU->_visibleLayerDescs[1]._ignoreMiddle = true;
+
+                sfDescReLU->_visibleLayerDescs[1]._predict = false;
+
+                sfDescReLU->_visibleLayerDescs[1]._size = { _higherLayers[layerIndex]._size.x, _higherLayers[layerIndex]._size.y };
+
+                if (params.find("sfr_r_radius_hidden") != params.end())
+                    sfDescReLU->_visibleLayerDescs[1]._radiusHidden = std::stoi(params["sfr_r_radius_hidden"]);
+
+                if (params.find("sfr_r_radius_visible") != params.end())
+                    sfDescReLU->_visibleLayerDescs[1]._radiusVisible = std::stoi(params["sfr_r_radius_visible"]);
+
+                if (params.find("sfr_r_weightAlpha_hidden") != params.end())
+                    sfDescReLU->_visibleLayerDescs[1]._weightAlphaHidden = std::stof(params["sfr_r_weightAlpha_hidden"]);
+
+                if (params.find("sfr_r_weightAlpha_visible") != params.end())
+                    sfDescReLU->_visibleLayerDescs[1]._weightAlphaVisible = std::stof(params["sfr_r_weightAlpha_visible"]);
+
+                if (params.find("sfr_r_lambda") != params.end())
+                    sfDescReLU->_visibleLayerDescs[1]._lambda = std::stof(params["sfr_r_lambda"]);
+            }
+        }
+
+        sfDesc = sfDescReLU;
 
         break;
     }
@@ -604,7 +754,7 @@ void ValueField2D::load(const schemas::ValueField2D* fbValueField2D, ComputeSyst
     _size.y = fbValueField2D->_size()->y();
 
     flatbuffers::uoffset_t numValues = fbValueField2D->_data()->Length();
-    _data.reserve(numValues);
+    _data.resize(numValues);
     for (flatbuffers::uoffset_t i = 0; i < numValues; i++)
         _data[i] = fbValueField2D->_data()->Get(i);
 }
@@ -728,31 +878,31 @@ flatbuffers::Offset<schemas::HigherLayer> HigherLayer::save(flatbuffers::FlatBuf
 }
 
 void Architect::load(const schemas::Architect* fbArchitect, ComputeSystem &cs) {
-    if (!_inputLayers.empty()) {
-        assert(_inputLayers.size() == fbArchitect->_inputLayers()->Length());
+    if (_inputLayers.empty()) {
+        _inputLayers.resize(fbArchitect->_inputLayers()->Length());
     }
     else {
-        _inputLayers.reserve(fbArchitect->_inputLayers()->Length());
+        assert(_inputLayers.size() == fbArchitect->_inputLayers()->Length());
     }
     for (flatbuffers::uoffset_t i = 0; i < fbArchitect->_inputLayers()->Length(); i++) {
         _inputLayers[i].load(fbArchitect->_inputLayers()->Get(i), cs);
     }
 
-    if (!_actionLayers.empty()) {
-        assert(_actionLayers.size() == fbArchitect->_actionLayers()->Length());
+    if (_actionLayers.empty()) {
+        _actionLayers.resize(fbArchitect->_actionLayers()->Length());
     }
     else {
-        _actionLayers.reserve(fbArchitect->_actionLayers()->Length());
+        assert(_actionLayers.size() == fbArchitect->_actionLayers()->Length());
     }
     for (flatbuffers::uoffset_t i = 0; i < fbArchitect->_actionLayers()->Length(); i++) {
         _actionLayers[i].load(fbArchitect->_actionLayers()->Get(i), cs);
     }
 
-    if (!_higherLayers.empty()) {
-        assert(_higherLayers.size() == fbArchitect->_higherLayers()->Length());
+    if (_higherLayers.empty()) {
+        _higherLayers.resize(fbArchitect->_higherLayers()->Length());
     }
     else {
-        _higherLayers.reserve(fbArchitect->_higherLayers()->Length());
+        assert(_higherLayers.size() == fbArchitect->_higherLayers()->Length());
     }
     for (flatbuffers::uoffset_t i = 0; i < fbArchitect->_higherLayers()->Length(); i++) {
         _higherLayers[i].load(fbArchitect->_higherLayers()->Get(i), cs);

@@ -14,18 +14,13 @@ struct VisibleAgentLayerDesc {
     _size:int2;
     _radius:int;
     _qAlpha:float;
-	_actionAlpha:float;
 }
 
 table VisibleAgentLayer {
     _qWeights:DoubleBuffer3D;
-	_actionWeights:DoubleBuffer3D;
-    _qToVisible:float2;
-    _visibleToQ:float2;
-    _reverseRadiiQ:int2;
 	_hiddenToVisible:float2;
     _visibleToHidden:float2;
-    _reverseRadiiHidden:int2;
+    _reverseRadii:int2;
 }
 
 table AgentLayer {
@@ -33,12 +28,11 @@ table AgentLayer {
     _actionTileSize:int2;
     _hiddenSize:int2;
     _qStates:DoubleBuffer2D;
-    _actionProbabilities:DoubleBuffer2D;
     _actionTaken:DoubleBuffer2D;
+    _actionTakenMax:DoubleBuffer2D;
+	_oneHotAction:DoubleBuffer2D;
     _tdError:Image2D;
-    _oneHotAction:Image2D;
     _hiddenSummationTempQ:DoubleBuffer2D;
-    _hiddenSummationTempHidden:DoubleBuffer2D;
     _visibleLayerDescs:[VisibleAgentLayerDesc];
     _visibleLayers:[VisibleAgentLayer];
 }

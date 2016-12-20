@@ -39,11 +39,11 @@ void kernel sfsStimulus(read_only image2d_t visibleStates,
                 float visibleState = read_imagef(visibleStates, defaultSampler, visiblePosition).x;
 
                 subSum += weight * visibleState;
-				count += weight;
+				count += visibleState * visibleState;
             }
         }
 
-    write_imagef(hiddenSummationTempFront, hiddenPosition, (float4)(sum + subSum / fmax(0.0001f, count), 0.0f, 0.0f, 0.0f));
+    write_imagef(hiddenSummationTempFront, hiddenPosition, (float4)(sum + subSum / fmax(0.0001f, sqrt(count)), 0.0f, 0.0f, 0.0f));
 }
 
 void kernel sfsActivate(read_only image2d_t stimuli, read_only image2d_t hiddenStatesPrev, read_only image2d_t biases,
@@ -61,8 +61,8 @@ void kernel sfsActivate(read_only image2d_t stimuli, read_only image2d_t hiddenS
 
     float bias = read_imagef(biases, defaultSampler, hiddenPosition).x;
 
-    //float activation = (stimulus + bias) * (1.0f - tracePrev);
-	float activation = stimulus + bias;// * randFloat(&seedValue);
+    float activation = fmax(0.0f, stimulus + bias) * (1.0f - tracePrev);
+	//float activation = stimulus + bias;// * randFloat(&seedValue);
 
     write_imagef(hiddenActivationsFront, hiddenPosition, (float4)(activation, 0.0f, 0.0f, 0.0f));
 }
@@ -101,7 +101,7 @@ void kernel sfsInhibit(read_only image2d_t activations,
     write_imagef(hiddenStatesFront, hiddenPosition, (float4)(state, fmax(gamma * tracePrev, state), 0.0f, 0.0f));
 }
 
-void kernel sfsInhibitPred(read_only image2d_t activations,
+void kernel sfsInhibitOther(read_only image2d_t activations,
     write_only image2d_t hiddenStatesFront,
     int2 hiddenSize, int radius, float activeRatio)
 {
@@ -159,12 +159,12 @@ void kernel sfsLearnWeights(read_only image2d_t hiddenStates, read_only image2d_
 
                 float weightPrev = read_imagef(weightsBack, defaultSampler, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0)).x;
 
-                weightSum += weightPrev;
+                weightSum += weightPrev * weightPrev;
             }
         }
-		
-	float scale = 1.0f / fmax(0.0001f, weightSum);
-		
+	
+	float scale = 1.0f / fmax(0.0001f, sqrt(weightSum));
+	
     for (int dx = -radius; dx <= radius; dx++)
         for (int dy = -radius; dy <= radius; dy++) {
             int2 visiblePosition = visiblePositionCenter + (int2)(dx, dy);
@@ -181,7 +181,7 @@ void kernel sfsLearnWeights(read_only image2d_t hiddenStates, read_only image2d_
 
                 float learn = hiddenStatePrev * visibleStatePrev - hiddenStatePrev * visibleState;
 
-                write_imagef(weightsFront, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0), (float4)(fmin(1.0f, fmax(0.0001f, weightPrev * scale + weightAlpha * learn)), 0.0f, 0.0f, 0.0f));
+                write_imagef(weightsFront, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0), (float4)(weightPrev * scale + weightAlpha * learn, 0.0f, 0.0f, 0.0f));
             }
         }
 }
@@ -194,13 +194,15 @@ void kernel sfsLearnBiases(read_only image2d_t stimuli, read_only image2d_t hidd
 
     float hiddenBiasPrev = read_imagef(hiddenBiasesBack, defaultSampler, hiddenPosition).x;
 
-    write_imagef(hiddenBiasesFront, hiddenPosition, (float4)(fmax(0.0001f, hiddenBiasPrev * (1.0f - hiddenState) + biasAlpha), 0.0f, 0.0f, 0.0f));
+    write_imagef(hiddenBiasesFront, hiddenPosition, (float4)(hiddenBiasPrev + biasAlpha * (activeRatio - hiddenState), 0.0f, 0.0f, 0.0f));
 }
 
-void kernel sfsDeriveInputs(read_only image2d_t inputs, write_only image2d_t outputsFront) {
+void kernel sfsDeriveInputs(read_only image2d_t inputs, read_only image2d_t outputsBack, write_only image2d_t outputsFront, float lambda) {
     int2 position = (int2)(get_global_id(0), get_global_id(1));
 
     float input = read_imagef(inputs, defaultSampler, position).x;
+	
+	float tracePrev = read_imagef(outputsBack, defaultSampler, position).y;
 
-    write_imagef(outputsFront, position, (float4)(input, 0.0f, 0.0f, 0.0f));
+    write_imagef(outputsFront, position, (float4)(input, lambda * tracePrev + (1.0f - lambda) * input, 0.0f, 0.0f));
 }

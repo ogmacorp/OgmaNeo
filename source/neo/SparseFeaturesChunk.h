@@ -53,7 +53,7 @@ namespace ogmaneo {
             */
             VisibleLayerDesc()
                 : _size({ 8, 8 }), _radius(8), _ignoreMiddle(false),
-                _weightAlpha(0.1f), _lambda(0.0f)
+                _weightAlpha(0.01f), _lambda(0.9f)
             {}
 
             //!@{
@@ -80,14 +80,9 @@ namespace ogmaneo {
             DoubleBuffer3D _samples;
 
             /*!
-            \brief Reconstruction errors
-            */
-            cl::Image3D _recons;
-
-            /*!
             \brief Weights
             */
-            DoubleBuffer3D _weights; // Encoding weights (creates spatio-temporal sparse code)
+            DoubleBuffer3D _weights;
 
             //!@{
             /*!
@@ -95,6 +90,8 @@ namespace ogmaneo {
             */
             cl_float2 _hiddenToVisible;
             cl_float2 _visibleToHidden;
+
+            cl_float2 _chunkToVisible;
 
             cl_int2 _reverseRadii;
             //!@}
@@ -123,8 +120,6 @@ namespace ogmaneo {
             cl_int2 _hiddenSize;
             cl_int2 _chunkSize;
             int _numSamples;
-            cl_float _biasAlpha;
-            cl_float _gamma;
             cl_float2 _initWeightRange;
             std::mt19937 _rng;
             //!@}
@@ -133,12 +128,10 @@ namespace ogmaneo {
             \brief Defaults
             */
             SparseFeaturesChunkDesc()
-                : _hiddenSize({ 16, 16 }),
-                _chunkSize({ 8, 8 }),
+                : _hiddenSize({ 36, 36 }),
+                _chunkSize({ 6, 6 }),
                 _numSamples(1),
-                _biasAlpha(0.0f),
-                _gamma(1.6f),
-                _initWeightRange({ 0.0f, 1.0f }),
+                _initWeightRange({ -0.01f, 0.01f }),
                 _rng()
             {
                 _name = "chunk";
@@ -160,7 +153,7 @@ namespace ogmaneo {
             \brief Factory
             */
             std::shared_ptr<SparseFeatures> sparseFeaturesFactory() override {
-                return std::make_shared<SparseFeaturesChunk>(*_cs, *_sfcProgram, _visibleLayerDescs, _hiddenSize, _chunkSize, _numSamples, _biasAlpha, _gamma, _initWeightRange, _rng);
+                return std::make_shared<SparseFeaturesChunk>(*_cs, *_sfcProgram, _visibleLayerDescs, _hiddenSize, _chunkSize, _numSamples, _initWeightRange, _rng);
             }
 
             //!@{
@@ -175,23 +168,17 @@ namespace ogmaneo {
     private:
         //!@{
         /*!
-        \brief Hidden states, biases, chunk winners
+        \brief Hidden states, activations, chunk winners
         */
         DoubleBuffer2D _hiddenStates;
         DoubleBuffer2D _hiddenActivations;
-        DoubleBuffer2D _hiddenBiases;
-        cl::Image2D _chunkWinners;
+        DoubleBuffer2D _chunkWinners;
         //!@}
 
         /*!
         \brief Hidden size
         */
         cl_int2 _hiddenSize;
-
-        /*!
-        \brief Ratio between number of hidden states and number of chunks
-        */
-        cl_float2 _chunkToHidden;
 
         /*!
         \brief Size of chunks
@@ -220,9 +207,7 @@ namespace ogmaneo {
         cl::Kernel _activateKernel;
         cl::Kernel _inhibitKernel;
         cl::Kernel _inhibitOtherKernel;
-        cl::Kernel _reconstructKernel;
         cl::Kernel _learnWeightsKernel;
-        cl::Kernel _learnBiasesKernel;
         cl::Kernel _deriveInputsKernel;
         //!@}
 
@@ -232,8 +217,6 @@ namespace ogmaneo {
         \brief Additional parameters
         */
         int _numSamples;
-        float _biasAlpha;
-        float _gamma;
         //!@}
 
         /*!
@@ -253,8 +236,6 @@ namespace ogmaneo {
             cl_int2 hiddenSize,
             cl_int2 chunkSize,
             int numSamples,
-            cl_float biasAlpha,
-            cl_float gamma,
             cl_float2 initWeightRange,
             std::mt19937 &rng);
 
@@ -277,7 +258,7 @@ namespace ogmaneo {
         \param activeRatio % active units.
         \param gamma synaptic trace decay.
         */
-        void learn(ComputeSystem &cs, std::mt19937 &rng) override;
+        void learn(ComputeSystem &cs, const cl::Image2D &predictionsPrev, std::mt19937 &rng) override;
 
         /*!
         \brief Inhibit
@@ -321,10 +302,24 @@ namespace ogmaneo {
         }
 
         /*!
-        \brief Get context
+        \brief Get hidden states
         */
         const cl::Image2D &getHiddenContext() const override {
-            return _hiddenActivations[_back];
+            return _hiddenStates[_back];
+        }
+
+        /*!
+        \brief Get hidden activations
+        */
+        const DoubleBuffer2D &getHiddenActivations() const {
+            return _hiddenActivations;
+        }
+
+        /*!
+        \brief Get hidden chunk winner
+        */
+        const DoubleBuffer2D &getChunkWinners() const {
+            return _chunkWinners;
         }
 
         /*!

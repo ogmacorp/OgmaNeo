@@ -15,11 +15,11 @@ namespace ogmaneo.schemas;
 table AgentSwarmLayerDesc {
     _radius:int;
     _qAlpha:float;
-	_actionAlpha:float;
     _qGamma:float;
     _qLambda:float;
-	_actionLambda:float;
-	_maxActionWeightMag:float;
+	_epsilon:float;
+	_chunkSize:int2;
+	_chunkGamma:float;
 }
 
 table AgentSwarmLayerDescs {

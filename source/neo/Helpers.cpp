@@ -252,6 +252,7 @@ flatbuffers::Offset<schemas::Image2D> ogmaneo::save(cl::Image2D &img, flatbuffer
             &format, width, height, elementSize, schemas::PixelData_FloatArray, floatArray.Union());
         break;
     }
+    case CL_UNSIGNED_INT8:
     case CL_SIGNED_INT8:
     {
         std::vector<unsigned char> pixels(width * height * (elementSize / sizeof(unsigned char)), 0);
@@ -301,6 +302,7 @@ flatbuffers::Offset<schemas::Image3D> ogmaneo::save(cl::Image3D &img, flatbuffer
             &format, width, height, depth, elementSize, schemas::PixelData_FloatArray, floatArray.Union());
         break;
     }
+    case CL_UNSIGNED_INT8:
     case CL_SIGNED_INT8:
     {
         std::vector<unsigned char> pixels(width * height * depth * (elementSize / sizeof(unsigned char)), 0);
@@ -322,40 +324,25 @@ flatbuffers::Offset<schemas::Image3D> ogmaneo::save(cl::Image3D &img, flatbuffer
 }
 
 void ogmaneo::load(DoubleBuffer2D &db, const schemas::DoubleBuffer2D* fbDB, ComputeSystem &cs) {
-    if (db[_front].get() == cl_mem()) {
-        db[_front] = cl::Image2D(cs.getContext(), CL_MEM_READ_WRITE,
-            cl::ImageFormat(fbDB->_front()->format()->image_channel_order(), fbDB->_back()->format()->image_channel_data_type()),
-            fbDB->_front()->width(), fbDB->_front()->height());
-    }
-
-    if (db[_back].get() == cl_mem()) {
-        db[_back] = cl::Image2D(cs.getContext(), CL_MEM_READ_WRITE,
-            cl::ImageFormat(fbDB->_back()->format()->image_channel_order(), fbDB->_back()->format()->image_channel_data_type()),
-            fbDB->_back()->width(), fbDB->_back()->height());
-    }
+    if (db[_front].get() == nullptr || db[_back].get() == nullptr)
+        return;
 
     ogmaneo::load(db[_front], fbDB->_front(), cs);
     ogmaneo::load(db[_back], fbDB->_back(), cs);
 }
 
 void ogmaneo::load(DoubleBuffer3D &db, const schemas::DoubleBuffer3D* fbDB, ComputeSystem &cs) {
-    if (db[_front].get() == cl_mem()) {
-        db[_front] = cl::Image3D(cs.getContext(), CL_MEM_READ_WRITE,
-            cl::ImageFormat(fbDB->_front()->format()->image_channel_order(), fbDB->_back()->format()->image_channel_data_type()),
-            fbDB->_front()->width(), fbDB->_front()->height(), fbDB->_front()->depth());
-    }
-
-    if (db[_back].get() == cl_mem()) {
-        db[_back] = cl::Image3D(cs.getContext(), CL_MEM_READ_WRITE,
-            cl::ImageFormat(fbDB->_back()->format()->image_channel_order(), fbDB->_back()->format()->image_channel_data_type()),
-            fbDB->_back()->width(), fbDB->_back()->height(), fbDB->_back()->depth());
-    }
+    if (db[_front].get() == nullptr || db[_back].get() == nullptr)
+        return;
 
     ogmaneo::load(db[_front], fbDB->_front(), cs);
     ogmaneo::load(db[_back], fbDB->_back(), cs);
 }
 
 flatbuffers::Offset<schemas::DoubleBuffer2D> ogmaneo::save(DoubleBuffer2D &db, flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs) {
+    if (db[_front].get() == nullptr || db[_back].get() == nullptr)
+        return schemas::CreateDoubleBuffer2D(builder, 0, 0);
+
     return schemas::CreateDoubleBuffer2D(builder,
         ogmaneo::save(db[_front], builder, cs),
         ogmaneo::save(db[_back], builder, cs)
@@ -363,6 +350,9 @@ flatbuffers::Offset<schemas::DoubleBuffer2D> ogmaneo::save(DoubleBuffer2D &db, f
 }
 
 flatbuffers::Offset<schemas::DoubleBuffer3D> ogmaneo::save(DoubleBuffer3D &db, flatbuffers::FlatBufferBuilder& builder, ComputeSystem &cs) {
+    if (db[_front].get() == nullptr || db[_back].get() == nullptr)
+        return schemas::CreateDoubleBuffer3D(builder, 0, 0);
+
     return schemas::CreateDoubleBuffer3D(builder,
         ogmaneo::save(db[_front], builder, cs),
         ogmaneo::save(db[_back], builder, cs)
