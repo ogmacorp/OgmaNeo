@@ -15,7 +15,7 @@ void kernel plDeriveInputs(read_only image2d_t inputs, read_only image2d_t outpu
 
 	float outputPrev = read_imagef(outputsBack, defaultSampler, position).x;
 
-    write_imagef(outputsFront, position, (float4)(input, fabs(input - outputPrev), 0.0f, 0.0f));
+    write_imagef(outputsFront, position, (float4)(input, fmax(0.0f, input - outputPrev), 0.0f, 0.0f));
 }
 
 void kernel plStimulus(read_only image2d_t visibleStates,

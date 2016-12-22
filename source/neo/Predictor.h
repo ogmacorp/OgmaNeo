@@ -38,7 +38,7 @@ namespace ogmaneo {
             \brief Initialize defaults
             */
             PredLayerDesc()
-                : _radius(10), _alpha(0.1f), _beta(0.2f)
+                : _radius(8), _alpha(0.1f), _beta(0.3f)
             {}
 
             //!@{

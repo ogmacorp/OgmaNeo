@@ -218,9 +218,7 @@ void kernel sfrLearnWeightsHidden(read_only image2d_t hiddenStatesPrev,
 	float2 hiddenStatePrev = read_imagef(hiddenStatesPrev, defaultSampler, hiddenPosition).xy;
 	
 	float error = (hiddenStatePrev.x == 0.0f ? 0.0f : 1.0f - hiddenStatePrev.x * hiddenStatePrev.x) * (read_imagef(errors, defaultSampler, hiddenPosition).x > 0.0f ? 1.0f : -1.0f);
-	
-	error *= (error > 0.0f ? (1.0f - hiddenStatePrev.y) : hiddenStatePrev.y);
-	
+
 	for (int s = 0; s < numSamples; s++) {
 		for (int dx = -radius; dx <= radius; dx++)
 			for (int dy = -radius; dy <= radius; dy++) {
@@ -287,11 +285,9 @@ void kernel sfrLearnBiases(read_only image2d_t hiddenStatesPrev,
 	
 	float error = (hiddenStatePrev.x == 0.0f ? 0.0f : 1.0f - hiddenStatePrev.x * hiddenStatePrev.x) * (read_imagef(errors, defaultSampler, hiddenPosition).x > 0.0f ? 1.0f : -1.0f);
 	
-	error *= (error > 0.0f ? (1.0f - hiddenStatePrev.y) : hiddenStatePrev.y);
-	
 	float biasPrev = read_imagef(biasesBack, defaultSampler, hiddenPosition).x;
 	
-	float bias = biasPrev + biasAlpha * error;
+	float bias = biasPrev + biasAlpha * (activeRatio - hiddenStatePrev.x);
 	
 	write_imagef(biasesFront, hiddenPosition, (float4)(bias, 0.0f, 0.0f, 0.0f));
 }

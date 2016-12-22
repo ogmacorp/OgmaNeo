@@ -30,6 +30,7 @@ table VisibleChunkLayer {
 table SparseFeaturesChunkDesc {
 	_hiddenSize:int2;
     _chunkSize:int2;
+	_numSamples:int;
 	_initWeightRange:float2;
 	_visibleLayerDescs:[VisibleChunkLayerDesc];
 }
@@ -40,6 +41,7 @@ table SparseFeaturesChunk {
     _chunkWinners:DoubleBuffer2D;
     _hiddenSize:int2;
     _chunkSize:int2;
+	_numSamples:int;
     _hiddenSummationTemp:DoubleBuffer2D;
     _visibleLayerDescs:[VisibleChunkLayerDesc];
     _visibleLayers:[VisibleChunkLayer];

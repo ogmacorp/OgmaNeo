@@ -30,9 +30,9 @@ void kernel sfcStimulus(read_only image3d_t samples,
 	int2 hiddenPosition = (int2)(get_global_id(0), get_global_id(1));
 	
 	int2 chunkPosition = (int2)(hiddenPosition.x / chunkSize.x, hiddenPosition.y / chunkSize.y);
-	int2 chunkCenter = (int2)(chunkPosition.x + 0.5f, chunkPosition.y + 0.5f);
+	float2 chunkCenter = (float2)(chunkPosition.x + 0.5f, chunkPosition.y + 0.5f);
 	
-	int2 visiblePositionCenter = project(chunkCenter, chunkToVisible);
+	int2 visiblePositionCenter = projectf(chunkCenter, chunkToVisible);
 
 	float sum = read_imagef(hiddenSummationTempBack, defaultSampler, hiddenPosition).x;
 
@@ -57,7 +57,9 @@ void kernel sfcStimulus(read_only image3d_t samples,
 
 					float sample = read_imagef(samples, defaultSampler, (int4)(visiblePosition.x, visiblePosition.y, s, 0)).x;
 
-					subSum += sample * weight;
+					float delta = sample - weight;
+					
+					subSum += -delta * delta;
 				}
 			}
 	}
@@ -72,7 +74,7 @@ void kernel sfcActivate(read_only image2d_t hiddenStimuli, read_only image2d_t h
 	
 	float hiddenStimulus = read_imagef(hiddenStimuli, defaultSampler, hiddenPosition).x;
 	
-	float tracePrev = read_imagef(hiddenStatesPrev, defaultSampler, hiddenPosition).y;
+	//float tracePrev = read_imagef(hiddenStatesPrev, defaultSampler, hiddenPosition).y;
 	
 	write_imagef(hiddenActivationsFront, hiddenPosition, (float4)(hiddenStimulus, 0.0f, 0.0f, 0.0f));
 }
@@ -112,6 +114,8 @@ void kernel sfcInhibit(read_only image2d_t activations,
 
 			if (inBounds0(hiddenPosition, hiddenSize)) {
 				float hiddenState = (dx == maxDelta.x && dy == maxDelta.y) ? 1.0f : 0.0f;
+                
+				//float tracePrev = read_imagef(hiddenStatesBack, defaultSampler, hiddenPosition).y;
                 
 				write_imagef(hiddenStatesFront, hiddenPosition, (float4)(hiddenState, 0.0f, 0.0f, 0.0f));
 			}
@@ -164,9 +168,9 @@ void kernel sfcLearnWeights(read_only image2d_t chunkWinners, read_only image2d_
 	int2 hiddenPosition = (int2)(get_global_id(0), get_global_id(1));
 
 	int2 chunkPosition = (int2)(hiddenPosition.x / chunkSize.x, hiddenPosition.y / chunkSize.y);
-	int2 chunkCenter = (int2)(chunkPosition.x + 0.5f, chunkPosition.y + 0.5f);
+	float2 chunkCenter = (float2)(chunkPosition.x + 0.5f, chunkPosition.y + 0.5f);
 	
-	int2 visiblePositionCenter = project(chunkCenter, chunkToVisible);
+	int2 visiblePositionCenter = projectf(chunkCenter, chunkToVisible);
 	
 	int2 fieldLowerBound = visiblePositionCenter - (int2)(radius);
 
@@ -186,28 +190,8 @@ void kernel sfcLearnWeights(read_only image2d_t chunkWinners, read_only image2d_
 	float neighbor = (manhattanDist == 1 || (abs(delta.x) == 1 && abs(delta.y) == 1)) ? 1.0f : 0.0f;
 	
 	float strength = (chunkWinnerf.x == chunkWinnerPrevf.x && chunkWinnerf.y == chunkWinnerPrevf.y) ? 0.0f : hiddenState + neighbor;
-	
-	float weightSum = 0.0f;
-	
-	for (int s = 0; s < numSamples; s++) {
-		for (int dx = -radius; dx <= radius; dx++)
-			for (int dy = -radius; dy <= radius; dy++) {
-				int2 visiblePosition = visiblePositionCenter + (int2)(dx, dy);
+	//float strength = hiddenState + neighbor;
 
-				if (inBounds0(visiblePosition, visibleSize)) {
-					int2 offset = visiblePosition - fieldLowerBound;
-
-					int wi = s + numSamples * (offset.y + offset.x * (radius * 2 + 1));
-
-					float weightPrev = read_imagef(weightsBack, defaultSampler, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0)).x;
-
-					weightSum += weightPrev * weightPrev;
-				}
-			}
-	}
-	
-	float scale = 1.0f / fmax(0.0001f, weightSum);
-	
 	for (int s = 0; s < numSamples; s++) {
 		for (int dx = -radius; dx <= radius; dx++)
 			for (int dy = -radius; dy <= radius; dy++) {
@@ -222,9 +206,11 @@ void kernel sfcLearnWeights(read_only image2d_t chunkWinners, read_only image2d_
 
 					float sample = read_imagef(samples, defaultSampler, (int4)(visiblePosition.x, visiblePosition.y, s, 0)).x;
 
-					float sLearn = strength * sample; 
+					float delta = sample - weightPrev;
+					
+					float sLearn = strength * delta; 
 
-					write_imagef(weightsFront, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0), (float4)(weightPrev * scale + weightAlpha * sLearn, 0.0f, 0.0f, 0.0f));
+					write_imagef(weightsFront, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0), (float4)(weightPrev + weightAlpha * sLearn, 0.0f, 0.0f, 0.0f));
 				}
 			}
 	}

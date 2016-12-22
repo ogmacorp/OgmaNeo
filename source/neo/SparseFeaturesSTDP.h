@@ -52,7 +52,7 @@ namespace ogmaneo {
             \brief Initialize defaults
             */
             VisibleLayerDesc()
-                : _size({ 8, 8 }), _radius(10), _ignoreMiddle(false),
+                : _size({ 8, 8 }), _radius(8), _ignoreMiddle(false),
                 _weightAlpha(0.01f), _lambda(0.9f)
             {}
 
@@ -125,8 +125,8 @@ namespace ogmaneo {
             SparseFeaturesSTDPDesc()
                 : _hiddenSize({ 16, 16 }),
                 _inhibitionRadius(6),
-                _biasAlpha(0.01f), _activeRatio(0.01f), _gamma(0.96f),
-                _initWeightRange({ -0.01f, 0.01f }),
+                _biasAlpha(0.001f), _activeRatio(0.01f), _gamma(0.96f),
+                _initWeightRange({ 0.0f, 0.05f }),
                 _rng()
             {
                 _name = "STDP";

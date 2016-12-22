@@ -39,11 +39,11 @@ void kernel sfsStimulus(read_only image2d_t visibleStates,
                 float visibleState = read_imagef(visibleStates, defaultSampler, visiblePosition).x;
 
                 subSum += weight * visibleState;
-				count += visibleState * visibleState;
+				count += weight;
             }
         }
 
-    write_imagef(hiddenSummationTempFront, hiddenPosition, (float4)(sum + subSum / fmax(0.0001f, sqrt(count)), 0.0f, 0.0f, 0.0f));
+    write_imagef(hiddenSummationTempFront, hiddenPosition, (float4)(sum + subSum / fmax(0.0001f, count), 0.0f, 0.0f, 0.0f));
 }
 
 void kernel sfsActivate(read_only image2d_t stimuli, read_only image2d_t hiddenStatesPrev, read_only image2d_t biases,
@@ -146,25 +146,6 @@ void kernel sfsLearnWeights(read_only image2d_t hiddenStates, read_only image2d_
     float hiddenState = read_imagef(hiddenStates, defaultSampler, hiddenPosition).x;
     float hiddenStatePrev = read_imagef(hiddenStatesPrev, defaultSampler, hiddenPosition).x;
 
-	float weightSum = 0.0f;
-	
-	for (int dx = -radius; dx <= radius; dx++)
-        for (int dy = -radius; dy <= radius; dy++) {
-            int2 visiblePosition = visiblePositionCenter + (int2)(dx, dy);
-
-            if (inBounds0(visiblePosition, visibleSize)) {
-                int2 offset = visiblePosition - fieldLowerBound;
-
-                int wi = offset.y + offset.x * (radius * 2 + 1);
-
-                float weightPrev = read_imagef(weightsBack, defaultSampler, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0)).x;
-
-                weightSum += weightPrev * weightPrev;
-            }
-        }
-	
-	float scale = 1.0f / fmax(0.0001f, sqrt(weightSum));
-	
     for (int dx = -radius; dx <= radius; dx++)
         for (int dy = -radius; dy <= radius; dy++) {
             int2 visiblePosition = visiblePositionCenter + (int2)(dx, dy);
@@ -179,9 +160,9 @@ void kernel sfsLearnWeights(read_only image2d_t hiddenStates, read_only image2d_
                 float visibleState = read_imagef(visibleStates, defaultSampler, visiblePosition).x;
 				float visibleStatePrev = read_imagef(visibleStatesPrev, defaultSampler, visiblePosition).x;
 
-                float learn = hiddenStatePrev * visibleStatePrev - hiddenStatePrev * visibleState;
+                float learn = hiddenStatePrev * visibleStatePrev * (1.0f - weightPrev) - hiddenStatePrev * visibleState * weightPrev;
 
-                write_imagef(weightsFront, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0), (float4)(weightPrev * scale + weightAlpha * learn, 0.0f, 0.0f, 0.0f));
+                write_imagef(weightsFront, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0), (float4)(fmin(1.0f, fmax(0.0f, weightPrev + weightAlpha * learn)), 0.0f, 0.0f, 0.0f));
             }
         }
 }

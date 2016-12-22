@@ -41,7 +41,7 @@ namespace ogmaneo {
             */
             VisibleLayerDesc()
                 : _size({ 16, 16 }),
-                _radius(10),
+                _radius(8),
                 _alpha(0.1f)
             {}
 

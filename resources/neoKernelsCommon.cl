@@ -17,7 +17,7 @@ constant sampler_t normalizedClampedNearestSampler = CLK_NORMALIZED_COORDS_TRUE 
     CLK_FILTER_NEAREST;
 
 constant sampler_t normalizedClampedToEdgeNearestSampler = CLK_NORMALIZED_COORDS_TRUE |
-    CLK_ADDRESS_CLAMP_TO_EDGE |
+    CLK_ADDRESS_CLAMP |
     CLK_FILTER_NEAREST;
 
 constant sampler_t unnormalizedClampedNearestSampler = CLK_NORMALIZED_COORDS_FALSE |
@@ -25,11 +25,11 @@ constant sampler_t unnormalizedClampedNearestSampler = CLK_NORMALIZED_COORDS_FAL
     CLK_FILTER_NEAREST;
 
 constant sampler_t defaultNormalizedSampler = CLK_NORMALIZED_COORDS_TRUE |
-    CLK_ADDRESS_CLAMP_TO_EDGE |
+    CLK_ADDRESS_CLAMP |
     CLK_FILTER_NEAREST;
 
 constant sampler_t defaultUnnormalizedSampler = CLK_NORMALIZED_COORDS_FALSE |
-    CLK_ADDRESS_CLAMP_TO_EDGE |
+    CLK_ADDRESS_CLAMP |
     CLK_FILTER_NEAREST;
 
 // ----------------------------------------- Common -----------------------------------------
@@ -81,6 +81,10 @@ bool inBounds(int2 position, int2 lowerBound, int2 upperBound) {
 
 int2 project(int2 position, float2 toScalars) {
     return (int2)((position.x + 0.5f) * toScalars.x, (position.y + 0.5f) * toScalars.y);
+}
+
+int2 projectf(float2 position, float2 toScalars) {
+    return (int2)(position.x * toScalars.x, position.y * toScalars.y);
 }
 
 // Initialize a random uniform 2D image (X field)
