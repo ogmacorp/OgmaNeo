@@ -1,3 +1,10 @@
+1.2.1  December 22, 2016
+========================
+
+- Projection fix in Kernel
+- Chunk encoder uses distance metric
+- Better default parameters
+
 1.2  December 19, 2016
 ========================
 

@@ -45,11 +45,11 @@ namespace ogmaneo {
             \brief Initialize defaults
             */
             AgentLayerDesc()
-                : _radius(12), _qAlpha(0.1f),
-                _qGamma(0.99f), _qLambda(0.98f),
-                _epsilon(0.08f),
+                : _radius(12), _qAlpha(0.3f),
+                _qGamma(0.994f), _qLambda(0.99f),
+                _epsilon(0.04f),
                 _chunkSize({ 8, 8 }),
-                _chunkGamma(0.5f)
+                _chunkGamma(0.0f)
             {}
 
             //!@{
