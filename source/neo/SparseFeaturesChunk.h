@@ -53,7 +53,7 @@ namespace ogmaneo {
             */
             VisibleLayerDesc()
                 : _size({ 8, 8 }), _radius(8), _ignoreMiddle(false),
-                _weightAlpha(0.01f), _lambda(0.9f)
+                _weightAlpha(0.04f), _lambda(0.97f)
             {}
 
             //!@{
@@ -130,7 +130,7 @@ namespace ogmaneo {
             SparseFeaturesChunkDesc()
                 : _hiddenSize({ 36, 36 }),
                 _chunkSize({ 6, 6 }),
-                _numSamples(1),
+                _numSamples(2),
                 _initWeightRange({ -0.01f, 0.01f }),
                 _rng()
             {

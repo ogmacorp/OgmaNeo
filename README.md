@@ -156,7 +156,6 @@ Sparse features Chunk (prefix 'sfc'):
  - sfc_chunkSize (int, int): Size of a chunk.
  - sfc_initWeightRange (float, float): Weight initialization range.
  - sfc_numSamples (int): Number of temporally extended samples (1 means no additional samples).
- - sfc_gamma (float): Falloff (higher means faster) for SOM neighborhood radius.
  - Feed forward inputs (prefix 'ff'):
     - sfc_ff_radius (int): Radius onto feed forward inputs.
     - sfc_ff_weightAlpha (float): Learning rate for feed forward inputs.

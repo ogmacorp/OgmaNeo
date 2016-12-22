@@ -88,7 +88,7 @@ SparseFeaturesChunk::SparseFeaturesChunk(ComputeSystem &cs, ComputeProgram &sfcP
 
     _hiddenSummationTemp = createDoubleBuffer2D(cs, _hiddenSize, CL_R, CL_FLOAT);
 
-    cs.getQueue().enqueueFillImage(_hiddenStates[_back], cl_float4{ 0.0f, 0.0f, 0.0f, 0.0f }, zeroOrigin, hiddenRegion);
+    cs.getQueue().enqueueFillImage(_hiddenStates[_back], cl_float4{ 0.0f, 1.0f, 0.0f, 0.0f }, zeroOrigin, hiddenRegion);
     cs.getQueue().enqueueFillImage(_hiddenActivations[_back], cl_float4{ 0.0f, 0.0f, 0.0f, 0.0f }, zeroOrigin, hiddenRegion);
 
     // Create kernels
@@ -328,7 +328,7 @@ flatbuffers::Offset<schemas::SparseFeaturesChunkDesc> SparseFeaturesChunk::Spars
         visibleLayerDescs.push_back(layerDesc.save(builder, cs));
 
     return schemas::CreateSparseFeaturesChunkDesc(builder,
-        &hiddenSize, &chunkSize,
+        &hiddenSize, &chunkSize, _numSamples,
         &initWeightRange, builder.CreateVectorOfStructs(visibleLayerDescs));
 }
 
@@ -344,6 +344,8 @@ void SparseFeaturesChunk::load(const schemas::SparseFeatures* fbSparseFeatures, 
 
     _hiddenSize = cl_int2{ fbSparseFeaturesChunk->_hiddenSize()->x(), fbSparseFeaturesChunk->_hiddenSize()->y() };
     _chunkSize = cl_int2{ fbSparseFeaturesChunk->_chunkSize()->x(), fbSparseFeaturesChunk->_chunkSize()->y() };
+
+    _numSamples = fbSparseFeaturesChunk->_numSamples();
 
     ogmaneo::load(_hiddenStates, fbSparseFeaturesChunk->_hiddenStates(), cs);
     ogmaneo::load(_hiddenActivations, fbSparseFeaturesChunk->_hiddenActivations(), cs);
@@ -375,7 +377,7 @@ flatbuffers::Offset<schemas::SparseFeatures> SparseFeaturesChunk::save(flatbuffe
         ogmaneo::save(_hiddenStates, builder, cs),
         ogmaneo::save(_hiddenActivations, builder, cs),
         ogmaneo::save(_chunkWinners, builder, cs),
-        &hiddenSize, &chunkSize,
+        &hiddenSize, &chunkSize, _numSamples,
         ogmaneo::save(_hiddenSummationTemp, builder, cs),
         builder.CreateVectorOfStructs(visibleLayerDescs),
         builder.CreateVector(visibleLayers));
