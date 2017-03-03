@@ -1,3 +1,14 @@
+1.3 March, 2017
+===============
+
+- Implementation of exponential memory
+- New distance encoder layer
+- Removal of Scalar Encoder, replaced with use of distance encoder
+- Removal of superseeded Delay, ReLU, and STDP encoders
+- Removal and rewrite of w.i.p. reinforcement learning within the hierarchy
+- Improved temporal striding
+- Seperation of hierachy activation and learning
+
 1.2.1  December 22, 2016
 ========================
 

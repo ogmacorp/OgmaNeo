@@ -12,14 +12,25 @@ include "PredictorLayer.fbs";
 
 namespace ogmaneo.schemas;
 
-struct PredLayerDesc {
+table PredLayerDesc {
+	_isQ:bool;
 	_radius:int;
 	_alpha:float;
 	_beta:float;
+	_lambda:float;
+	_gamma:float;
+}
+
+table PredLayerDescs {
+	_pLayerDescs:[PredLayerDesc];
+}
+
+table PredictorLayers {
+	_pLayers:[PredictorLayer];
 }
 
 table Predictor {
 	_h:FeatureHierarchy;
-	_pLayerDescs:[PredLayerDesc];
-	_pLayers:[PredictorLayer];
+	_pLayerDescs:[PredLayerDescs];
+	_pLayers:[PredictorLayers];
 }

@@ -8,9 +8,7 @@
 
 include "Helpers.fbs";
 include "SparseFeaturesChunk.fbs";
-include "SparseFeaturesDelay.fbs";
-include "SparseFeaturesSTDP.fbs";
-include "SparseFeaturesReLU.fbs";
+include "SparseFeaturesDistance.fbs";
 
 namespace ogmaneo.schemas;
 
@@ -25,9 +23,7 @@ table SparseFeaturesDesc {
 
 union SparseFeaturesType {
     SparseFeaturesChunk,
-    SparseFeaturesDelay,
-    SparseFeaturesSTDP,
-    SparseFeaturesReLU
+	SparseFeaturesDistance
 }
 
 table SparseFeatures {

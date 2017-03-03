@@ -6,13 +6,13 @@
 //  in the OGMANEO_LICENSE.md file included in this distribution.
 // ----------------------------------------------------------------------------
 
-#include "SparseFeaturesChunk.h"
+#include "SparseFeaturesDistance.h"
 
 #include "PredictorLayer.h"
 
 using namespace ogmaneo;
 
-SparseFeaturesChunk::SparseFeaturesChunk(ComputeSystem &cs, ComputeProgram &sfcProgram,
+SparseFeaturesDistance::SparseFeaturesDistance(ComputeSystem &cs, ComputeProgram &sfdProgram,
     const std::vector<VisibleLayerDesc> &visibleLayerDescs, cl_int2 hiddenSize,
     cl_int2 chunkSize,
     float gamma,
@@ -21,7 +21,7 @@ SparseFeaturesChunk::SparseFeaturesChunk(ComputeSystem &cs, ComputeProgram &sfcP
 {
     cl_float4 zeroColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
-    _type = SparseFeaturesType::_chunk;
+    _type = SparseFeaturesType::_distance;
 
     _visibleLayerDescs = visibleLayerDescs;
 
@@ -36,8 +36,8 @@ SparseFeaturesChunk::SparseFeaturesChunk(ComputeSystem &cs, ComputeProgram &sfcP
 
     _visibleLayers.resize(_visibleLayerDescs.size());
 
-    cl::Kernel randomUniform2DKernel = cl::Kernel(sfcProgram.getProgram(), "randomUniform2D");
-    cl::Kernel randomUniform3DKernel = cl::Kernel(sfcProgram.getProgram(), "randomUniform3D");
+    cl::Kernel randomUniform2DKernel = cl::Kernel(sfdProgram.getProgram(), "randomUniform2D");
+    cl::Kernel randomUniform3DKernel = cl::Kernel(sfdProgram.getProgram(), "randomUniform3D");
 
     int chunksInX = static_cast<int>(std::ceil(static_cast<float>(_hiddenSize.x) / static_cast<float>(_chunkSize.x)));
     int chunksInY = static_cast<int>(std::ceil(static_cast<float>(_hiddenSize.y) / static_cast<float>(_chunkSize.y)));
@@ -90,7 +90,7 @@ SparseFeaturesChunk::SparseFeaturesChunk(ComputeSystem &cs, ComputeProgram &sfcP
     }
 
     // Hidden state data
-    _hiddenStates = createDoubleBuffer2D(cs, _hiddenSize, CL_R, CL_FLOAT);
+    _hiddenStates = createDoubleBuffer2D(cs, _hiddenSize, CL_RG, CL_FLOAT);
     _hiddenActivations = createDoubleBuffer2D(cs, _hiddenSize, CL_R, CL_FLOAT);
 
     _chunkWinners = createDoubleBuffer2D(cs, { chunksInX, chunksInY }, CL_RG, CL_FLOAT);
@@ -101,18 +101,18 @@ SparseFeaturesChunk::SparseFeaturesChunk(ComputeSystem &cs, ComputeProgram &sfcP
     cs.getQueue().enqueueFillImage(_hiddenActivations[_back], cl_float4{ 0.0f, 0.0f, 0.0f, 0.0f }, zeroOrigin, hiddenRegion);
 
     // Create kernels
-    _addSampleKernel = cl::Kernel(sfcProgram.getProgram(), "sfcAddSample");  
-    _stimulusKernel = cl::Kernel(sfcProgram.getProgram(), "sfcStimulus");
-    _learnWeightsKernel = cl::Kernel(sfcProgram.getProgram(), "sfcLearnWeights");
-    _activateKernel = cl::Kernel(sfcProgram.getProgram(), "sfcActivate");
-    _inhibitKernel = cl::Kernel(sfcProgram.getProgram(), "sfcInhibit");
-    _inhibitOtherKernel = cl::Kernel(sfcProgram.getProgram(), "sfcInhibitOther");
-    _deriveInputsKernel = cl::Kernel(sfcProgram.getProgram(), "sfcDeriveInputs");
-    _sumKernel = cl::Kernel(sfcProgram.getProgram(), "sfcSum");
-    _sliceKernel = cl::Kernel(sfcProgram.getProgram(), "sfcSlice");
+    _addSampleKernel = cl::Kernel(sfdProgram.getProgram(), "sfdAddSample");  
+    _stimulusKernel = cl::Kernel(sfdProgram.getProgram(), "sfdStimulus");
+    _learnWeightsKernel = cl::Kernel(sfdProgram.getProgram(), "sfdLearnWeights");
+    _activateKernel = cl::Kernel(sfdProgram.getProgram(), "sfdActivate");
+    _inhibitKernel = cl::Kernel(sfdProgram.getProgram(), "sfdInhibit");
+    _inhibitOtherKernel = cl::Kernel(sfdProgram.getProgram(), "sfdInhibitOther");
+    _deriveInputsKernel = cl::Kernel(sfdProgram.getProgram(), "sfdDeriveInputs");
+    _sumKernel = cl::Kernel(sfdProgram.getProgram(), "sfdSum");
+    _sliceKernel = cl::Kernel(sfdProgram.getProgram(), "sfdSlice");
 }
 
-void SparseFeaturesChunk::subSample(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, std::mt19937 &rng) {
+void SparseFeaturesDistance::subSample(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, std::mt19937 &rng) {
     // Find up stimulus
     for (int vli = 0; vli < _visibleLayers.size(); vli++) {
         VisibleLayer &vl = _visibleLayers[vli];
@@ -147,7 +147,7 @@ void SparseFeaturesChunk::subSample(ComputeSystem &cs, const std::vector<cl::Ima
     }
 }
 
-cl::Image2D &SparseFeaturesChunk::getSubSample(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) {
+cl::Image2D &SparseFeaturesDistance::getSubSample(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) {
     VisibleLayer &vl = _visibleLayers[vli];
     VisibleLayerDesc &vld = _visibleLayerDescs[vli];
 
@@ -165,7 +165,7 @@ cl::Image2D &SparseFeaturesChunk::getSubSample(ComputeSystem &cs, int vli, int i
     return vl._samplesSlice;
 }
 
-cl::Image2D &SparseFeaturesChunk::getSubSampleAccum(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) {
+cl::Image2D &SparseFeaturesDistance::getSubSampleAccum(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) {
     VisibleLayer &vl = _visibleLayers[vli];
     VisibleLayerDesc &vld = _visibleLayerDescs[vli];
 
@@ -183,7 +183,7 @@ cl::Image2D &SparseFeaturesChunk::getSubSampleAccum(ComputeSystem &cs, int vli, 
     return vl._samplesSlice;
 }
 
-void SparseFeaturesChunk::activate(ComputeSystem &cs, std::mt19937 &rng) {
+void SparseFeaturesDistance::activate(ComputeSystem &cs, std::mt19937 &rng) {
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
     cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
@@ -236,16 +236,18 @@ void SparseFeaturesChunk::activate(ComputeSystem &cs, std::mt19937 &rng) {
         int argIndex = 0;
 
         _inhibitKernel.setArg(argIndex++, _hiddenActivations[_front]);
+        _inhibitKernel.setArg(argIndex++, _hiddenStates[_back]);
         _inhibitKernel.setArg(argIndex++, _hiddenStates[_front]);
         _inhibitKernel.setArg(argIndex++, _chunkWinners[_front]);
         _inhibitKernel.setArg(argIndex++, _hiddenSize);
         _inhibitKernel.setArg(argIndex++, _chunkSize);
+        _inhibitKernel.setArg(argIndex++, _gamma);
 
         cs.getQueue().enqueueNDRangeKernel(_inhibitKernel, cl::NullRange, cl::NDRange(chunksInX, chunksInY));
     }
 }
 
-void SparseFeaturesChunk::stepEnd(ComputeSystem &cs) {
+void SparseFeaturesDistance::stepEnd(ComputeSystem &cs) {
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
     cl::array<cl::size_type, 3> hiddenRegion = { static_cast<cl_uint>(_hiddenSize.x), static_cast<cl_uint>(_hiddenSize.y), 1 };
 
@@ -261,7 +263,7 @@ void SparseFeaturesChunk::stepEnd(ComputeSystem &cs) {
     }
 }
 
-void SparseFeaturesChunk::learn(ComputeSystem &cs, std::mt19937 &rng) {
+void SparseFeaturesDistance::learn(ComputeSystem &cs, std::mt19937 &rng) {
     // Learn weights
     for (int vli = 0; vli < _visibleLayers.size(); vli++) {
         VisibleLayer &vl = _visibleLayers[vli];
@@ -283,7 +285,6 @@ void SparseFeaturesChunk::learn(ComputeSystem &cs, std::mt19937 &rng) {
             _learnWeightsKernel.setArg(argIndex++, vld._radius);
             _learnWeightsKernel.setArg(argIndex++, vld._weightAlpha);
             _learnWeightsKernel.setArg(argIndex++, vld._numSamples);
-            _learnWeightsKernel.setArg(argIndex++, _gamma);
 
             cs.getQueue().enqueueNDRangeKernel(_learnWeightsKernel, cl::NullRange, cl::NDRange(_hiddenSize.x, _hiddenSize.y));
         }
@@ -292,7 +293,7 @@ void SparseFeaturesChunk::learn(ComputeSystem &cs, std::mt19937 &rng) {
     }
 }
 
-void SparseFeaturesChunk::inhibit(ComputeSystem &cs, const cl::Image2D &activations, cl::Image2D &states, std::mt19937 &rng) {
+void SparseFeaturesDistance::inhibit(ComputeSystem &cs, const cl::Image2D &activations, cl::Image2D &states, std::mt19937 &rng) {
     // Inhibit
     int chunksInX = static_cast<int>(std::ceil(static_cast<float>(_hiddenSize.x) / static_cast<float>(_chunkSize.x)));
     int chunksInY = static_cast<int>(std::ceil(static_cast<float>(_hiddenSize.y) / static_cast<float>(_chunkSize.y)));
@@ -307,7 +308,7 @@ void SparseFeaturesChunk::inhibit(ComputeSystem &cs, const cl::Image2D &activati
     cs.getQueue().enqueueNDRangeKernel(_inhibitOtherKernel, cl::NullRange, cl::NDRange(chunksInX, chunksInY));
 }
 
-void SparseFeaturesChunk::clearMemory(ComputeSystem &cs) {
+void SparseFeaturesDistance::clearMemory(ComputeSystem &cs) {
     cl_float4 zeroColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 
     cl::array<cl::size_type, 3> zeroOrigin = { 0, 0, 0 };
@@ -331,113 +332,113 @@ void SparseFeaturesChunk::clearMemory(ComputeSystem &cs) {
     }
 }
 
-void SparseFeaturesChunk::VisibleLayerDesc::load(const schemas::VisibleChunkLayerDesc* fbVisibleChunkLayerDesc, ComputeSystem &cs) {
-    _size = cl_int2{ fbVisibleChunkLayerDesc->_size().x(), fbVisibleChunkLayerDesc->_size().y() };
-    _numSamples = fbVisibleChunkLayerDesc->_numSamples();
-    _radius = fbVisibleChunkLayerDesc->_radius();
-    _ignoreMiddle = fbVisibleChunkLayerDesc->_ignoreMiddle();
-    _weightAlpha = fbVisibleChunkLayerDesc->_weightAlpha();
-    _lambda = fbVisibleChunkLayerDesc->_lambda();
+void SparseFeaturesDistance::VisibleLayerDesc::load(const schemas::VisibleDistanceLayerDesc* fbVisibleDistanceLayerDesc, ComputeSystem &cs) {
+    _size = cl_int2{ fbVisibleDistanceLayerDesc->_size().x(), fbVisibleDistanceLayerDesc->_size().y() };
+    _numSamples = fbVisibleDistanceLayerDesc->_numSamples();
+    _radius = fbVisibleDistanceLayerDesc->_radius();
+    _ignoreMiddle = fbVisibleDistanceLayerDesc->_ignoreMiddle();
+    _weightAlpha = fbVisibleDistanceLayerDesc->_weightAlpha();
+    _lambda = fbVisibleDistanceLayerDesc->_lambda();
 }
 
-schemas::VisibleChunkLayerDesc SparseFeaturesChunk::VisibleLayerDesc::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
+schemas::VisibleDistanceLayerDesc SparseFeaturesDistance::VisibleLayerDesc::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
     schemas::int2 size(_size.x, _size.y);
-    return schemas::VisibleChunkLayerDesc(size, _numSamples, _radius, _ignoreMiddle, _weightAlpha, _lambda);
+    return schemas::VisibleDistanceLayerDesc(size, _numSamples, _radius, _ignoreMiddle, _weightAlpha, _lambda);
 }
 
-void SparseFeaturesChunk::VisibleLayer::load(const schemas::VisibleChunkLayer* fbVisibleChunkLayer, ComputeSystem &cs) {
-    ogmaneo::load(_samples, fbVisibleChunkLayer->_samples(), cs);
-    ogmaneo::load(_samplesAccum, fbVisibleChunkLayer->_samplesAccum(), cs);
-    ogmaneo::load(_weights, fbVisibleChunkLayer->_weights(), cs);
-    _hiddenToVisible = cl_float2{ fbVisibleChunkLayer->_hiddenToVisible()->x(), fbVisibleChunkLayer->_hiddenToVisible()->y() };
-    _visibleToHidden = cl_float2{ fbVisibleChunkLayer->_visibleToHidden()->x(), fbVisibleChunkLayer->_visibleToHidden()->y() };
-    _reverseRadii = cl_int2{ fbVisibleChunkLayer->_reverseRadii()->x(), fbVisibleChunkLayer->_reverseRadii()->y() };
+void SparseFeaturesDistance::VisibleLayer::load(const schemas::VisibleDistanceLayer* fbVisibleDistanceLayer, ComputeSystem &cs) {
+    ogmaneo::load(_samples, fbVisibleDistanceLayer->_samples(), cs);
+    ogmaneo::load(_samplesAccum, fbVisibleDistanceLayer->_samplesAccum(), cs);
+    ogmaneo::load(_weights, fbVisibleDistanceLayer->_weights(), cs);
+    _hiddenToVisible = cl_float2{ fbVisibleDistanceLayer->_hiddenToVisible()->x(), fbVisibleDistanceLayer->_hiddenToVisible()->y() };
+    _visibleToHidden = cl_float2{ fbVisibleDistanceLayer->_visibleToHidden()->x(), fbVisibleDistanceLayer->_visibleToHidden()->y() };
+    _reverseRadii = cl_int2{ fbVisibleDistanceLayer->_reverseRadii()->x(), fbVisibleDistanceLayer->_reverseRadii()->y() };
 }
 
-flatbuffers::Offset<schemas::VisibleChunkLayer> SparseFeaturesChunk::VisibleLayer::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
+flatbuffers::Offset<schemas::VisibleDistanceLayer> SparseFeaturesDistance::VisibleLayer::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
     schemas::float2 hiddenToVisible(_hiddenToVisible.x, _hiddenToVisible.y);
     schemas::float2 visibleToHidden(_visibleToHidden.x, _visibleToHidden.y);
     schemas::int2 reverseRadii(_reverseRadii.x, _reverseRadii.y);
 
-    return schemas::CreateVisibleChunkLayer(builder,
+    return schemas::CreateVisibleDistanceLayer(builder,
         ogmaneo::save(_samples, builder, cs),
         ogmaneo::save(_samplesAccum, builder, cs),
         ogmaneo::save(_weights, builder, cs),
         &hiddenToVisible, &visibleToHidden, &reverseRadii);
 }
 
-void SparseFeaturesChunk::SparseFeaturesChunkDesc::load(const schemas::SparseFeaturesChunkDesc* fbSparseFeaturesChunkDesc, ComputeSystem &cs) {
-    assert(_hiddenSize.x == fbSparseFeaturesChunkDesc->_hiddenSize()->x());
-    assert(_hiddenSize.y == fbSparseFeaturesChunkDesc->_hiddenSize()->y());
-    assert(_visibleLayerDescs.size() == fbSparseFeaturesChunkDesc->_visibleLayerDescs()->Length());
+void SparseFeaturesDistance::SparseFeaturesDistanceDesc::load(const schemas::SparseFeaturesDistanceDesc* fbSparseFeaturesDistanceDesc, ComputeSystem &cs) {
+    assert(_hiddenSize.x == fbSparseFeaturesDistanceDesc->_hiddenSize()->x());
+    assert(_hiddenSize.y == fbSparseFeaturesDistanceDesc->_hiddenSize()->y());
+    assert(_visibleLayerDescs.size() == fbSparseFeaturesDistanceDesc->_visibleLayerDescs()->Length());
 
-    _hiddenSize = cl_int2{ fbSparseFeaturesChunkDesc->_hiddenSize()->x(), fbSparseFeaturesChunkDesc->_hiddenSize()->y() };
-    _chunkSize = cl_int2{ fbSparseFeaturesChunkDesc->_chunkSize()->x(), fbSparseFeaturesChunkDesc->_chunkSize()->y() };
-    _initWeightRange = cl_float2{ fbSparseFeaturesChunkDesc->_initWeightRange()->x(), fbSparseFeaturesChunkDesc->_initWeightRange()->y() };
+    _hiddenSize = cl_int2{ fbSparseFeaturesDistanceDesc->_hiddenSize()->x(), fbSparseFeaturesDistanceDesc->_hiddenSize()->y() };
+    _chunkSize = cl_int2{ fbSparseFeaturesDistanceDesc->_chunkSize()->x(), fbSparseFeaturesDistanceDesc->_chunkSize()->y() };
+    _initWeightRange = cl_float2{ fbSparseFeaturesDistanceDesc->_initWeightRange()->x(), fbSparseFeaturesDistanceDesc->_initWeightRange()->y() };
 
-    _gamma = fbSparseFeaturesChunkDesc->_gamma();
+    _gamma = fbSparseFeaturesDistanceDesc->_gamma();
 
-    for (flatbuffers::uoffset_t i = 0; i < fbSparseFeaturesChunkDesc->_visibleLayerDescs()->Length(); i++) {
-        _visibleLayerDescs[i].load(fbSparseFeaturesChunkDesc->_visibleLayerDescs()->Get(i), cs);
+    for (flatbuffers::uoffset_t i = 0; i < fbSparseFeaturesDistanceDesc->_visibleLayerDescs()->Length(); i++) {
+        _visibleLayerDescs[i].load(fbSparseFeaturesDistanceDesc->_visibleLayerDescs()->Get(i), cs);
     }
 }
 
-flatbuffers::Offset<schemas::SparseFeaturesChunkDesc> SparseFeaturesChunk::SparseFeaturesChunkDesc::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
+flatbuffers::Offset<schemas::SparseFeaturesDistanceDesc> SparseFeaturesDistance::SparseFeaturesDistanceDesc::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
     schemas::int2 hiddenSize(_hiddenSize.x, _hiddenSize.y);
     schemas::int2 chunkSize(_chunkSize.x, _chunkSize.y);
     schemas::float2 initWeightRange(_initWeightRange.x, _initWeightRange.y);
 
-    std::vector<schemas::VisibleChunkLayerDesc> visibleLayerDescs;
+    std::vector<schemas::VisibleDistanceLayerDesc> visibleLayerDescs;
     for (VisibleLayerDesc layerDesc : _visibleLayerDescs)
         visibleLayerDescs.push_back(layerDesc.save(builder, cs));
 
-    return schemas::CreateSparseFeaturesChunkDesc(builder,
+    return schemas::CreateSparseFeaturesDistanceDesc(builder,
         &hiddenSize, &chunkSize, _gamma,
         &initWeightRange, builder.CreateVectorOfStructs(visibleLayerDescs));
 }
 
-void SparseFeaturesChunk::load(const schemas::SparseFeatures* fbSparseFeatures, ComputeSystem &cs) {
-    assert(fbSparseFeatures->_sf_type() == schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesChunk);
-    schemas::SparseFeaturesChunk* fbSparseFeaturesChunk =
-        (schemas::SparseFeaturesChunk*)(fbSparseFeatures->_sf());
+void SparseFeaturesDistance::load(const schemas::SparseFeatures* fbSparseFeatures, ComputeSystem &cs) {
+    assert(fbSparseFeatures->_sf_type() == schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesDistance);
+    schemas::SparseFeaturesDistance* fbSparseFeaturesDistance =
+        (schemas::SparseFeaturesDistance*)(fbSparseFeatures->_sf());
 
-    assert(_hiddenSize.x == fbSparseFeaturesChunk->_hiddenSize()->x());
-    assert(_hiddenSize.y == fbSparseFeaturesChunk->_hiddenSize()->y());
-    assert(_visibleLayerDescs.size() == fbSparseFeaturesChunk->_visibleLayerDescs()->Length());
-    assert(_visibleLayers.size() == fbSparseFeaturesChunk->_visibleLayers()->Length());
+    assert(_hiddenSize.x == fbSparseFeaturesDistance->_hiddenSize()->x());
+    assert(_hiddenSize.y == fbSparseFeaturesDistance->_hiddenSize()->y());
+    assert(_visibleLayerDescs.size() == fbSparseFeaturesDistance->_visibleLayerDescs()->Length());
+    assert(_visibleLayers.size() == fbSparseFeaturesDistance->_visibleLayers()->Length());
 
-    _hiddenSize = cl_int2{ fbSparseFeaturesChunk->_hiddenSize()->x(), fbSparseFeaturesChunk->_hiddenSize()->y() };
-    _chunkSize = cl_int2{ fbSparseFeaturesChunk->_chunkSize()->x(), fbSparseFeaturesChunk->_chunkSize()->y() };
+    _hiddenSize = cl_int2{ fbSparseFeaturesDistance->_hiddenSize()->x(), fbSparseFeaturesDistance->_hiddenSize()->y() };
+    _chunkSize = cl_int2{ fbSparseFeaturesDistance->_chunkSize()->x(), fbSparseFeaturesDistance->_chunkSize()->y() };
 
-    _gamma = fbSparseFeaturesChunk->_gamma();
+    _gamma = fbSparseFeaturesDistance->_gamma();
 
-    ogmaneo::load(_hiddenStates, fbSparseFeaturesChunk->_hiddenStates(), cs);
-    ogmaneo::load(_hiddenActivations, fbSparseFeaturesChunk->_hiddenActivations(), cs);
-    ogmaneo::load(_chunkWinners, fbSparseFeaturesChunk->_chunkWinners(), cs);
-    ogmaneo::load(_hiddenSummationTemp, fbSparseFeaturesChunk->_hiddenSummationTemp(), cs);
+    ogmaneo::load(_hiddenStates, fbSparseFeaturesDistance->_hiddenStates(), cs);
+    ogmaneo::load(_hiddenActivations, fbSparseFeaturesDistance->_hiddenActivations(), cs);
+    ogmaneo::load(_chunkWinners, fbSparseFeaturesDistance->_chunkWinners(), cs);
+    ogmaneo::load(_hiddenSummationTemp, fbSparseFeaturesDistance->_hiddenSummationTemp(), cs);
 
-    for (flatbuffers::uoffset_t i = 0; i < fbSparseFeaturesChunk->_visibleLayerDescs()->Length(); i++) {
-        _visibleLayerDescs[i].load(fbSparseFeaturesChunk->_visibleLayerDescs()->Get(i), cs);
+    for (flatbuffers::uoffset_t i = 0; i < fbSparseFeaturesDistance->_visibleLayerDescs()->Length(); i++) {
+        _visibleLayerDescs[i].load(fbSparseFeaturesDistance->_visibleLayerDescs()->Get(i), cs);
     }
 
-    for (flatbuffers::uoffset_t i = 0; i < fbSparseFeaturesChunk->_visibleLayers()->Length(); i++) {
-        _visibleLayers[i].load(fbSparseFeaturesChunk->_visibleLayers()->Get(i), cs);
+    for (flatbuffers::uoffset_t i = 0; i < fbSparseFeaturesDistance->_visibleLayers()->Length(); i++) {
+        _visibleLayers[i].load(fbSparseFeaturesDistance->_visibleLayers()->Get(i), cs);
     }
 }
 
-flatbuffers::Offset<schemas::SparseFeatures> SparseFeaturesChunk::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
+flatbuffers::Offset<schemas::SparseFeatures> SparseFeaturesDistance::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
     schemas::int2 hiddenSize(_hiddenSize.x, _hiddenSize.y);
     schemas::int2 chunkSize(_chunkSize.x, _chunkSize.y);
 
-    std::vector<schemas::VisibleChunkLayerDesc> visibleLayerDescs;
+    std::vector<schemas::VisibleDistanceLayerDesc> visibleLayerDescs;
     for (VisibleLayerDesc layerDesc : _visibleLayerDescs)
         visibleLayerDescs.push_back(layerDesc.save(builder, cs));
 
-    std::vector<flatbuffers::Offset<schemas::VisibleChunkLayer>> visibleLayers;
+    std::vector<flatbuffers::Offset<schemas::VisibleDistanceLayer>> visibleLayers;
     for (VisibleLayer layer : _visibleLayers)
         visibleLayers.push_back(layer.save(builder, cs));
 
-    flatbuffers::Offset<schemas::SparseFeaturesChunk> sf = schemas::CreateSparseFeaturesChunk(builder,
+    flatbuffers::Offset<schemas::SparseFeaturesDistance> sf = schemas::CreateSparseFeaturesDistance(builder,
         ogmaneo::save(_hiddenStates, builder, cs),
         ogmaneo::save(_hiddenActivations, builder, cs),
         ogmaneo::save(_chunkWinners, builder, cs),
@@ -447,5 +448,5 @@ flatbuffers::Offset<schemas::SparseFeatures> SparseFeaturesChunk::save(flatbuffe
         builder.CreateVector(visibleLayers));
 
     return schemas::CreateSparseFeatures(builder,
-        schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesChunk, sf.Union());
+        schemas::SparseFeaturesType::SparseFeaturesType_SparseFeaturesDistance, sf.Union());
 }

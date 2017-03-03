@@ -22,17 +22,14 @@ table ParameterModifier {
 
 table InputLayer {
     _size:Vec2i;
+	_chunkSize:Vec2i;
+	_isQ:bool;
     _params:[Parameter];
 }
 
 enum SparseFeaturesTypeEnum : byte {
-    _stdp, _delay, _chunk
-}
-
-table ActionLayer {
-    _size:Vec2i;
-    _tileSize:Vec2i;
-    _params:[Parameter];
+    _chunk,
+    _distance
 }
 
 table HigherLayer {
@@ -43,7 +40,6 @@ table HigherLayer {
 
 table Architect {
     _inputLayers:[InputLayer];
-    _actionLayers:[ActionLayer];
     _higherLayers:[HigherLayer];
 }
 

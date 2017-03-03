@@ -21,19 +21,30 @@ namespace ogmaneo {
     class OGMA_API PredictorLayer {
     public:
         /*!
+        \brief Types of thresholding
+        */
+        enum Type {
+            _none, _inhibitBinary, _q
+        };
+
+        /*!
         \brief Layer descriptor
         */
         struct VisibleLayerDesc {
             //!@{
             /*!
             \brief Layer properties
-            Input size, radius onto input, learning rate.
+            Input size, radius onto input, learning rate, TD lambda, additional decay gamma.
             */
             cl_int2 _size;
 
             cl_int _radius;
 
             cl_float _alpha;
+    
+            cl_float _lambda; // For Q learning
+
+            cl_float _gamma;
             //!@}
 
             /*!
@@ -42,7 +53,8 @@ namespace ogmaneo {
             VisibleLayerDesc()
                 : _size({ 16, 16 }),
                 _radius(8),
-                _alpha(0.1f)
+                _alpha(0.01f), _lambda(0.98f),
+                _gamma(0.99f)
             {}
 
             //!@{
@@ -83,9 +95,19 @@ namespace ogmaneo {
 
     private:
         /*!
+        \brief Type of sparsity/thresholding
+        */
+        Type _type;
+
+        /*!
         \brief Size of the prediction
         */
         cl_int2 _hiddenSize;
+
+        /*!
+        \brief Size of chunks
+        */
+        cl_int2 _chunkSize;
 
         /*!
         \brief Hidden stimulus summation temporary buffer
@@ -97,14 +119,7 @@ namespace ogmaneo {
         \brief Predictions
         */
         DoubleBuffer2D _hiddenStates;
-        DoubleBuffer2D _hiddenActivations;
         //!@}
-
-        /*!
-        \brief
-        Encoder corresponding to this decoder, if available (else nullptr)
-        */
-        std::shared_ptr<SparseFeatures> _inhibitSparseFeatures;
 
         //!@{
         /*!
@@ -121,40 +136,47 @@ namespace ogmaneo {
         cl::Kernel _deriveInputsKernel;
         cl::Kernel _stimulusKernel;
         cl::Kernel _learnPredWeightsKernel;
-        cl::Kernel _thresholdKernel;
+        cl::Kernel _propagateKernel;
+        cl::Kernel _inhibitBinaryKernel;
         //!@}
 
     public:
         /*!
         \brief Create a predictor layer with random initialization.
-        Requires the ComputeSystem, ComputeProgram with the OgmaNeo kernels, and initialization information.
         \param cs is the ComputeSystem.
-        \param program is the ComputeProgram associated with the ComputeSystem and loaded with the main kernel code.
+        \param plProgram is the ComputeProgram associated with the ComputeSystem and loaded with the predictor kernel code.
         \param hiddenSize size of the predictions (output).
         \param visibleLayerDescs are descriptors for visible layers.
+        \param type inhibition/thresholding type.
+        \param chunkSize size of a chunk, if applicable (else 0).
         \param initWeightRange are the minimum and maximum range values for weight initialization.
         \param rng a random number generator.
         */
         void createRandom(ComputeSystem &cs, ComputeProgram &plProgram,
             cl_int2 hiddenSize, const std::vector<VisibleLayerDesc> &visibleLayerDescs,
-            const std::shared_ptr<SparseFeatures> &inhibitSparseFeatures,
+            Type type, cl_int2 chunkSize,
             cl_float2 initWeightRange, std::mt19937 &rng);
 
         /*!
         \brief Activate predictor (predict values)
         \param cs is the ComputeSystem.
         \param visibleStates the input layer states.
-        \param threshold whether or not the output should be thresholded (binary).
         */
         void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, std::mt19937 &rng);
+
+        /*!
+        \brief Propagate (reconstruct)
+        */
+        void propagate(ComputeSystem &cs, const cl::Image2D &hiddenStates, const cl::Image2D &hiddenTargets, int vli, DoubleBuffer2D &visibleStates, std::mt19937 &rng);
 
         /*!
         \brief Learn predictor
         \param cs is the ComputeSystem.
         \param targets target values to update towards.
-        \param visibleStatesPrev the input states of the !previous! timestep.
+        \param predictFromPrevious whether to map from (t-1) to (t) or (t) to (t).
+        \param tdError optional TD error for reinforcement learning.
         */
-        void learn(ComputeSystem &cs, const cl::Image2D &targets);
+        void learn(ComputeSystem &cs, const cl::Image2D &targets, bool predictFromPrevious = true, float tdError = 0.0f);
 
         /*!
         \brief Step end (buffer swap)

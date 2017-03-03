@@ -14,10 +14,9 @@ namespace ogmaneo.schemas;
 
 table Hierarchy {
     _p:Predictor;
-    _inputImages:[Image2D];
-    _corruptedInputImages:[Image2D];
+    _inputImagesFeed:[Image2D];
+    _inputImagesPredict:[Image2D];
     _predictions:[ValueField2D];
-    _readoutLayers:[PredictorLayer];
 }
 
 root_type Hierarchy;

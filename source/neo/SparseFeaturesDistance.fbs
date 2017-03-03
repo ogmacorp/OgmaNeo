@@ -10,41 +10,40 @@ include "Helpers.fbs";
 
 namespace ogmaneo.schemas;
 
-struct VisibleSTDPLayerDesc {
+struct VisibleDistanceLayerDesc {
 	_size:int2;
+	_numSamples:int;
 	_radius:int;
 	_ignoreMiddle:ubyte;
 	_weightAlpha:float;
+	_lambda:float;
 }
 
-table VisibleSTDPLayer {
-	_derivedInput:DoubleBuffer2D;
+table VisibleDistanceLayer {
+	_samples:DoubleBuffer3D;
+	_samplesAccum:DoubleBuffer3D;
 	_weights:DoubleBuffer3D;
 	_hiddenToVisible:float2;
 	_visibleToHidden:float2;
 	_reverseRadii:int2;
 }
 
-table SparseFeaturesSTDPDesc {
+table SparseFeaturesDistanceDesc {
 	_hiddenSize:int2;
-    _inhibitionRadius:int;
-    _biasAlpha:float;
-    _activeRatio:float;
-    _gamma:float;
+    _chunkSize:int2;
+	_gamma:float;
 	_initWeightRange:float2;
-	_visibleLayerDescs:[VisibleSTDPLayerDesc];
+	_visibleLayerDescs:[VisibleDistanceLayerDesc];
 }
 
-table SparseFeaturesSTDP {
-    _hiddenActivations:DoubleBuffer2D;
+table SparseFeaturesDistance {
     _hiddenStates:DoubleBuffer2D;
-    _hiddenBiases:DoubleBuffer2D;
+    _hiddenActivations:DoubleBuffer2D;
+    _chunkWinners:DoubleBuffer2D;
     _hiddenSize:int2;
-    _inhibitionRadius:int;
+    _chunkSize:int2;
+	_gamma:float;
     _hiddenSummationTemp:DoubleBuffer2D;
-    _biasAlpha:float;
-    _activeRatio:float;
-    _gamma:float;
-    _visibleLayerDescs:[VisibleSTDPLayerDesc];
-    _visibleLayers:[VisibleSTDPLayer];
+    _visibleLayerDescs:[VisibleDistanceLayerDesc];
+    _visibleLayers:[VisibleDistanceLayer];
 }

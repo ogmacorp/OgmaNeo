@@ -12,6 +12,7 @@ namespace ogmaneo.schemas;
 
 struct VisibleChunkLayerDesc {
 	_size:int2;
+	_numSamples:int;
 	_radius:int;
 	_ignoreMiddle:ubyte;
 	_weightAlpha:float;
@@ -19,8 +20,8 @@ struct VisibleChunkLayerDesc {
 }
 
 table VisibleChunkLayer {
-	_derivedInput:DoubleBuffer2D;
 	_samples:DoubleBuffer3D;
+	_samplesAccum:DoubleBuffer3D;
 	_weights:DoubleBuffer3D;
 	_hiddenToVisible:float2;
 	_visibleToHidden:float2;
@@ -30,7 +31,7 @@ table VisibleChunkLayer {
 table SparseFeaturesChunkDesc {
 	_hiddenSize:int2;
     _chunkSize:int2;
-	_numSamples:int;
+	_gamma:float;
 	_initWeightRange:float2;
 	_visibleLayerDescs:[VisibleChunkLayerDesc];
 }
@@ -41,7 +42,7 @@ table SparseFeaturesChunk {
     _chunkWinners:DoubleBuffer2D;
     _hiddenSize:int2;
     _chunkSize:int2;
-	_numSamples:int;
+	_gamma:float;
     _hiddenSummationTemp:DoubleBuffer2D;
     _visibleLayerDescs:[VisibleChunkLayerDesc];
     _visibleLayers:[VisibleChunkLayer];

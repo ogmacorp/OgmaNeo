@@ -15,7 +15,7 @@
 
 namespace ogmaneo {
     /*!
-    \brief Predicts temporal streams of data.
+    \brief Predicts temporal streams of data
     Combines the bottom-up feature hierarchy with top-down predictions.
     */
     class OGMA_API Predictor {
@@ -27,18 +27,22 @@ namespace ogmaneo {
             //!@{
             /*!
             \brief Predictor layer properties
-            Radius onto hidden layer, learning rates for feed-forward and feed-back.
+            Is Q layer, radius onto hidden layer, learning rates for feed-forward and feed-back, trace decays.
             */
+            bool _isQ;
+
             int _radius;
             float _alpha;
             float _beta;
+            float _lambda;
+            float _gamma;
             //!@}
 
             /*!
             \brief Initialize defaults
             */
             PredLayerDesc()
-                : _radius(8), _alpha(0.1f), _beta(0.3f)
+                : _isQ(false), _radius(8), _alpha(0.02f), _beta(0.04f), _lambda(0.98f), _gamma(0.99f)
             {}
 
             //!@{
@@ -46,7 +50,7 @@ namespace ogmaneo {
             \brief Serialization
             */
             void load(const schemas::PredLayerDesc* fbPredLayerDesc, ComputeSystem &cs);
-            schemas::PredLayerDesc save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            flatbuffers::Offset<schemas::PredLayerDesc> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
@@ -59,39 +63,54 @@ namespace ogmaneo {
         /*!
         \brief Layer descs
         */
-        std::vector<PredLayerDesc> _pLayerDescs;
+        std::vector<std::vector<PredLayerDesc>> _pLayerDescs; // 2D since each layer can predict multiple inputs
 
         /*!
         \brief Layers
         */
-        std::vector<PredictorLayer> _pLayers; // 2D since each layer can predict multiple inputs
+        std::vector<std::vector<PredictorLayer>> _pLayers; // 2D since each layer can predict multiple inputs
+
+        /*!
+        \brief Whether reset last tick
+        */
+        std::vector<bool> _needsUpdate;
 
     public:
         /*!
         \brief Create a sparse predictive hierarchy with random initialization.
         Requires the ComputeSystem, ComputeProgram with the OgmaNeo kernels, and initialization information.
         \param cs is the ComputeSystem.
+        \param hProgram is the ComputeProgram associated with the ComputeSystem and loaded with the hierarchy kernel code.
         \param pProgram is the ComputeProgram associated with the ComputeSystem and loaded with the predictor kernel code.
-        \brief shouldPredictInput describes which of the bottom (input) layers should be predicted (have an associated predictor layer).
+        \param inputSizes Size of each input layer.
+        \param inputChunkSizes Size of input chunks if applicable, 0 otherwise.
         \param pLayerDescs Predictor layer descriptors.
         \param hLayerDescs Feature hierarchy layer descriptors.
+        \param initWeightRange range to initialize predictors.
         \param rng a random number generator.
         */
         void createRandom(ComputeSystem &cs, ComputeProgram &hProgram, ComputeProgram &pProgram,
-            const std::vector<PredLayerDesc> &pLayerDescs, const std::vector<FeatureHierarchy::LayerDesc> &hLayerDescs,
+            const std::vector<cl_int2> &inputSizes, const std::vector<cl_int2> &inputChunkSizes,
+            const std::vector<std::vector<PredLayerDesc>> &pLayerDescs, const std::vector<FeatureHierarchy::LayerDesc> &hLayerDescs,
             cl_float2 initWeightRange,
             std::mt19937 &rng);
 
         /*!
-        \brief Simulation step of hierarchy
+        \brief Activation step of hierarchy
         \param cs is the ComputeSystem.
-        \param input input to the hierarchy (2D).
-        \param inputCorrupted in many cases you can pass in the same value as for input, but in some cases you can also pass
-        a corrupted version of the input for a "denoising auto-encoder" style effect on the learned weights.
+        \param inputsFeed input to the hierarchy (2D).
         \param rng a random number generator.
-        \param learn optional argument to disable learning.
         */
-        void simStep(ComputeSystem &cs, const std::vector<cl::Image2D> &inputs, const std::vector<cl::Image2D> &inputsCorrupted, std::mt19937 &rng, bool learn = true);
+        void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &inputsFeed, std::mt19937 &rng);
+
+        /*!
+        \brief Learning step of hierarchy
+        \param cs is the ComputeSystem.
+        \param inputsPredict input to the hierarchy (2D) that will be used as a prediction target.
+        \param rng a random number generator.
+        \param tdError optional TD error argument for reinforcement learning.
+        */
+        void learn(ComputeSystem &cs, const std::vector<cl::Image2D> &inputsPredict, std::mt19937 &rng, float tdError = 0.0f);
 
         /*!
         \brief Get number of predictor layers
@@ -104,22 +123,22 @@ namespace ogmaneo {
         /*!
         \brief Get access to a predictor layer
         */
-        const PredictorLayer &getPredLayer(int index) const {
+        const std::vector<PredictorLayer> &getPredLayer(int index) const {
             return _pLayers[index];
         }
 
         /*!
         \brief Get access to a predictor layer desc
         */
-        const PredLayerDesc &getPredLayerDesc(int index) const {
+        const std::vector<PredLayerDesc> &getPredLayerDesc(int index) const {
             return _pLayerDescs[index];
         }
 
         /*!
         \brief Get the predictions
         */
-        const DoubleBuffer2D &getHiddenPrediction() const {
-            return _pLayers.front().getHiddenStates();
+        const DoubleBuffer2D &getPredictions(int index) const {
+            return _pLayers.front()[index].getHiddenStates();
         }
 
         /*!
