@@ -28,7 +28,7 @@ DoubleBuffer3D ogmaneo::createDoubleBuffer3D(ComputeSystem &cs, cl_int3 size, cl
     return db;
 }
 
-void ogmaneo::randomUniform(cl::Image2D &image2D, ComputeSystem &cs, cl::Kernel &randomUniform2DKernel, cl_int2 size, cl_float2 range, std::mt19937 &rng) {
+void ogmaneo::randomUniform(cl::Image2D &image2D, ComputeSystem &cs, cl::Kernel &randomUniform2DKernel, cl_int2 size, cl_float4 lowerBounds, cl_float4 upperBounds, cl_float4 mask, cl_float4 fillConstants, std::mt19937 &rng) {
     int argIndex = 0;
 
     std::uniform_int_distribution<int> seedDist(0, 999);
@@ -37,12 +37,15 @@ void ogmaneo::randomUniform(cl::Image2D &image2D, ComputeSystem &cs, cl::Kernel 
 
     randomUniform2DKernel.setArg(argIndex++, image2D);
     randomUniform2DKernel.setArg(argIndex++, seed);
-    randomUniform2DKernel.setArg(argIndex++, range);
+    randomUniform2DKernel.setArg(argIndex++, lowerBounds);
+    randomUniform2DKernel.setArg(argIndex++, upperBounds);
+    randomUniform2DKernel.setArg(argIndex++, mask);
+    randomUniform2DKernel.setArg(argIndex++, fillConstants);
 
     cs.getQueue().enqueueNDRangeKernel(randomUniform2DKernel, cl::NullRange, cl::NDRange(size.x, size.y));
 }
 
-void ogmaneo::randomUniform(cl::Image3D &image3D, ComputeSystem &cs, cl::Kernel &randomUniform3DKernel, cl_int3 size, cl_float2 range, std::mt19937 &rng) {
+void ogmaneo::randomUniform(cl::Image3D &image3D, ComputeSystem &cs, cl::Kernel &randomUniform3DKernel, cl_int3 size, cl_float4 lowerBounds, cl_float4 upperBounds, cl_float4 mask, cl_float4 fillConstants, std::mt19937 &rng) {
     int argIndex = 0;
 
     std::uniform_int_distribution<int> seedDist(0, 999);
@@ -51,79 +54,12 @@ void ogmaneo::randomUniform(cl::Image3D &image3D, ComputeSystem &cs, cl::Kernel 
 
     randomUniform3DKernel.setArg(argIndex++, image3D);
     randomUniform3DKernel.setArg(argIndex++, seed);
-    randomUniform3DKernel.setArg(argIndex++, range);
+    randomUniform3DKernel.setArg(argIndex++, lowerBounds);
+    randomUniform3DKernel.setArg(argIndex++, upperBounds);
+    randomUniform3DKernel.setArg(argIndex++, mask);
+    randomUniform3DKernel.setArg(argIndex++, fillConstants);
 
     cs.getQueue().enqueueNDRangeKernel(randomUniform3DKernel, cl::NullRange, cl::NDRange(size.x, size.y, size.z));
-}
-
-void ogmaneo::randomUniformXY(cl::Image2D &image2D, ComputeSystem &cs, cl::Kernel &randomUniform2DXYKernel, cl_int2 size, cl_float2 range, std::mt19937 &rng) {
-    int argIndex = 0;
-
-    std::uniform_int_distribution<int> seedDist(0, 999);
-
-    cl_uint2 seed = { (cl_uint)seedDist(rng), (cl_uint)seedDist(rng) };
-
-    randomUniform2DXYKernel.setArg(argIndex++, image2D);
-    randomUniform2DXYKernel.setArg(argIndex++, seed);
-    randomUniform2DXYKernel.setArg(argIndex++, range);
-
-    cs.getQueue().enqueueNDRangeKernel(randomUniform2DXYKernel, cl::NullRange, cl::NDRange(size.x, size.y));
-}
-
-void ogmaneo::randomUniformXYZ(cl::Image2D &image2D, ComputeSystem &cs, cl::Kernel &randomUniform2DXYZKernel, cl_int2 size, cl_float2 range, std::mt19937 &rng) {
-    int argIndex = 0;
-
-    std::uniform_int_distribution<int> seedDist(0, 999);
-
-    cl_uint2 seed = { (cl_uint)seedDist(rng), (cl_uint)seedDist(rng) };
-
-    randomUniform2DXYZKernel.setArg(argIndex++, image2D);
-    randomUniform2DXYZKernel.setArg(argIndex++, seed);
-    randomUniform2DXYZKernel.setArg(argIndex++, range);
-
-    cs.getQueue().enqueueNDRangeKernel(randomUniform2DXYZKernel, cl::NullRange, cl::NDRange(size.x, size.y));
-}
-
-void ogmaneo::randomUniformXY(cl::Image3D &image3D, ComputeSystem &cs, cl::Kernel &randomUniform3DXYKernel, cl_int3 size, cl_float2 range, std::mt19937 &rng) {
-    int argIndex = 0;
-
-    std::uniform_int_distribution<int> seedDist(0, 999);
-
-    cl_uint2 seed = { (cl_uint)seedDist(rng), (cl_uint)seedDist(rng) };
-
-    randomUniform3DXYKernel.setArg(argIndex++, image3D);
-    randomUniform3DXYKernel.setArg(argIndex++, seed);
-    randomUniform3DXYKernel.setArg(argIndex++, range);
-
-    cs.getQueue().enqueueNDRangeKernel(randomUniform3DXYKernel, cl::NullRange, cl::NDRange(size.x, size.y, size.z));
-}
-
-void ogmaneo::randomUniformXZ(cl::Image2D &image2D, ComputeSystem &cs, cl::Kernel &randomUniform2DXZKernel, cl_int2 size, cl_float2 range, std::mt19937 &rng) {
-    int argIndex = 0;
-
-    std::uniform_int_distribution<int> seedDist(0, 999);
-
-    cl_uint2 seed = { (cl_uint)seedDist(rng), (cl_uint)seedDist(rng) };
-
-    randomUniform2DXZKernel.setArg(argIndex++, image2D);
-    randomUniform2DXZKernel.setArg(argIndex++, seed);
-    randomUniform2DXZKernel.setArg(argIndex++, range);
-
-    cs.getQueue().enqueueNDRangeKernel(randomUniform2DXZKernel, cl::NullRange, cl::NDRange(size.x, size.y));
-}
-
-void ogmaneo::randomUniformXZ(cl::Image3D &image3D, ComputeSystem &cs, cl::Kernel &randomUniform3DXZKernel, cl_int3 size, cl_float2 range, std::mt19937 &rng) {
-    int argIndex = 0;
-
-    std::uniform_int_distribution<int> seedDist(0, 999);
-
-    cl_uint2 seed = { (cl_uint)seedDist(rng), (cl_uint)seedDist(rng) };
-
-    randomUniform3DXZKernel.setArg(argIndex++, image3D);
-    randomUniform3DXZKernel.setArg(argIndex++, seed);
-    randomUniform3DXZKernel.setArg(argIndex++, range);
-
-    cs.getQueue().enqueueNDRangeKernel(randomUniform3DXZKernel, cl::NullRange, cl::NDRange(size.x, size.y, size.z));
 }
 
 void ogmaneo::load(cl::Image2D &img, const schemas::Image2D* fbImg, ComputeSystem &cs) {
@@ -143,13 +79,7 @@ void ogmaneo::load(cl::Image2D &img, const schemas::Image2D* fbImg, ComputeSyste
         const schemas::FloatArray* fbFloatArray =
             reinterpret_cast<const schemas::FloatArray*>(fbImg->pixels());
 
-        uint32_t numElements = width * height * (elementSize / sizeof(float));
-        std::vector<float> floatArray(numElements, 0.0f);
-
-        for (uint32_t i = 0; i < numElements; i++)
-            floatArray[i] = fbFloatArray->data()->Get(i);
-
-        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, 1 }, 0, 0, floatArray.data());
+        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, 1 }, 0, 0, static_cast<void*>(const_cast<float*>(fbFloatArray->data()->data())));
         cs.getQueue().finish();
         break;
     }
@@ -158,13 +88,7 @@ void ogmaneo::load(cl::Image2D &img, const schemas::Image2D* fbImg, ComputeSyste
         const schemas::ByteArray* fbByteArray =
             reinterpret_cast<const schemas::ByteArray*>(fbImg->pixels());
 
-        uint32_t numElements = width * height * (elementSize / sizeof(unsigned char));
-        std::vector<unsigned char> byteArray(numElements, 0);
-
-        for (uint32_t i = 0; i < numElements; i++)
-            byteArray[i] = fbByteArray->data()->Get(i);
-
-        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, 1 }, 0, 0, byteArray.data());
+        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, 1 }, 0, 0, static_cast<void*>(const_cast<uint8_t*>(fbByteArray->data()->data())));
         cs.getQueue().finish();
         break;
     }
@@ -193,13 +117,7 @@ void ogmaneo::load(cl::Image3D &img, const schemas::Image3D* fbImg, ComputeSyste
         const schemas::FloatArray* fbFloatArray =
             reinterpret_cast<const schemas::FloatArray*>(fbImg->pixels());
 
-        uint32_t numElements = width * height * depth * (elementSize / sizeof(float));
-        std::vector<float> floatArray(numElements, 0.0f);
-
-        for (uint32_t i = 0; i < numElements; i++)
-            floatArray[i] = fbFloatArray->data()->Get(i);
-
-        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, depth }, 0, 0, floatArray.data());
+        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, depth }, 0, 0, static_cast<void*>(const_cast<float*>(fbFloatArray->data()->data())));
         cs.getQueue().finish();
         break;
     }
@@ -208,13 +126,7 @@ void ogmaneo::load(cl::Image3D &img, const schemas::Image3D* fbImg, ComputeSyste
         const schemas::ByteArray* fbByteArray =
             reinterpret_cast<const schemas::ByteArray*>(fbImg->pixels());
 
-        uint32_t numElements = width * height * depth * (elementSize / sizeof(unsigned char));
-        std::vector<unsigned char> byteArray(numElements, 0);
-
-        for (uint32_t i = 0; i < numElements; i++)
-            byteArray[i] = fbByteArray->data()->Get(i);
-
-        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, depth }, 0, 0, byteArray.data());
+        cs.getQueue().enqueueWriteImage(img, CL_TRUE, { 0, 0, 0 }, { width, height, depth }, 0, 0, static_cast<void*>(const_cast<uint8_t*>(fbByteArray->data()->data())));
         cs.getQueue().finish();
         break;
     }

@@ -54,4 +54,5 @@ Some contributions are troublesome and therefore difficult to accept:
 
  * Website: https://ogma.ai/contact-ogma-ai/
  * Twitter: https://twitter.com/ogmacorp
+ * Gitter: https://gitter.im/ogmaneo
  * Email: contributing@ogmacorp.com

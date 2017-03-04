@@ -31,14 +31,12 @@ namespace ogmaneo {
 
         std::mt19937 _rng;
 
-        std::vector<cl::Image2D> _inputImages;
-        std::vector<cl::Image2D> _corruptedInputImages;
+        std::vector<cl::Image2D> _inputImagesFeed;
+        std::vector<cl::Image2D> _inputImagesPredict;
 
         std::vector<ValueField2D> _predictions;
 
         std::shared_ptr<Resources> _resources;
-
-        std::vector<PredictorLayer> _readoutLayers;
 
         //!@{
         /*!
@@ -52,27 +50,27 @@ namespace ogmaneo {
         /*!
         \brief Run a single simulation tick
         */
-        void simStep(std::vector<ValueField2D> &inputs, bool learn = true);
-        void simStep(std::vector<ValueField2D> &inputs, std::vector<ValueField2D> &corruptedInputs, bool learn = true);
+        void activate(std::vector<ValueField2D> &inputsFeed);
+        void learn(std::vector<ValueField2D> &inputsPredict, float tdError = 0.0f);
 
         /*!
-        \brief Get the input images
+        \brief Get the feed images (input)
         */
-        const std::vector<cl::Image2D> &getInputImages() const {
-            return _inputImages;
+        const std::vector<cl::Image2D> &getInputImagesFeed() const {
+            return _inputImagesFeed;
         }
 
         /*!
-        \brief Get the corrupted input images
+        \brief Get the prediction target images
         */
-        const std::vector<cl::Image2D> &getCorruptedInputImages() const {
-            return _corruptedInputImages;
+        const std::vector<cl::Image2D> &getInputImagesPredict() const {
+            return _inputImagesPredict;
         }
 
         /*!
-        \brief Get the action vector
+        \brief Get the predictions
         */
-        const std::vector<ValueField2D> &getPredictions() const {
+        std::vector<ValueField2D> &getPredictions() {
             return _predictions;
         }
 
@@ -81,13 +79,6 @@ namespace ogmaneo {
         */
         Predictor &getPredictor() {
             return _p;
-        }
-
-        /*!
-        \brief Get the prediction read out layers
-        */
-        const std::vector<PredictorLayer> &getReadOutPredictorLayers() const {
-            return _readoutLayers;
         }
 
         /*!

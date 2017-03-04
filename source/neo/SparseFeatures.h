@@ -83,14 +83,25 @@ namespace ogmaneo {
         virtual ~SparseFeatures() {}
 
         /*!
+        \brief Add a new sample
+        */
+        virtual void subSample(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, std::mt19937 &rng) = 0;
+
+        /*!
+        \retrieve a sample
+        */
+        virtual cl::Image2D &getSubSample(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) = 0;
+
+        /*!
+        \retrieve a sample
+        */
+        virtual cl::Image2D &getSubSampleAccum(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) = 0;
+
+        /*!
         \brief Activate predictor
         \param cs is the ComputeSystem.
-        \param visibleStates the input layer states.
-        \param lambda decay of hidden unit traces.
-        \param activeRatio % active units.
-        \param rng a random number generator.
         */
-        virtual void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, const cl::Image2D &predictionsPrev, std::mt19937 &rng) = 0;
+        virtual void activate(ComputeSystem &cs, std::mt19937 &rng) = 0;
 
         /*!
         \brief End a simulation step
@@ -100,17 +111,17 @@ namespace ogmaneo {
         /*!
         \brief Learning
         */
-        virtual void learn(ComputeSystem &cs, const cl::Image2D &predictionsPrev, std::mt19937 &rng) = 0;
-
-        /*!
-        \brief Inhibition
-        */
-        virtual void inhibit(ComputeSystem &cs, const cl::Image2D &activations, cl::Image2D &states, std::mt19937 &rng) = 0;
+        virtual void learn(ComputeSystem &cs, std::mt19937 &rng) = 0;
 
         /*!
         \brief Get hidden size
         */
         virtual cl_int2 getHiddenSize() const = 0;
+
+        /*!
+        \brief Get chunk size
+        */
+        virtual cl_int2 getChunkSize() const = 0;
 
         /*!
         \brief Get hidden states

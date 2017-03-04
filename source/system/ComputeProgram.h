@@ -17,11 +17,11 @@ namespace ogmaneo {
     \brief Possible encoder identifiers
     */
     enum SparseFeaturesType {
-        _stdp, _delay, _chunk, _ReLU
+        _chunk, _distance
     };
 
     /*!
-    \brief Compute program.
+    \brief Compute program
     Holds OpenCL compute program with their associated kernels.
     */
     class ComputeProgram {
@@ -53,19 +53,9 @@ namespace ogmaneo {
         bool loadPredictorKernel(ComputeSystem &cs);
 
         /*!
-        \brief Load hierarchy default packaged kernel
-        */
-        bool loadAgentSwarmKernel(ComputeSystem &cs);
-
-        /*!
         \brief Loader for different sparse features (encoders)
         */
         bool loadSparseFeaturesKernel(ComputeSystem &cs, SparseFeaturesType type);
-
-        /*!
-        \brief Load extras default packaged kernel
-        */
-        bool loadExtraKernel(ComputeSystem &cs);
 
         /*!
         \brief Get the underlying OpenCL program

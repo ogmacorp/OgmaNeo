@@ -10,7 +10,6 @@
 
 #include "system/SharedLib.h"
 #include "Predictor.h"
-#include "AgentSwarm.h"
 #include "schemas/Architect_generated.h"
 
 #include <unordered_map>
@@ -84,7 +83,6 @@ namespace ogmaneo {
 
         friend class Architect;
         friend class Hierarchy;
-        friend class Agent;
     };
 
     /*!
@@ -125,6 +123,10 @@ namespace ogmaneo {
 
         std::vector<float> &getData() {
             return _data;
+        }
+
+        void setValues(const std::vector<float> &values) {
+            _data = values;
         }
 
         //!@{
@@ -224,9 +226,12 @@ namespace ogmaneo {
         friend class Architect;
     };
 
-    struct InputLayer {
+    class InputLayer {
+    private:
         Vec2i _size;
-
+        bool _isQ;
+        Vec2i _chunkSize;
+        
         std::unordered_map<std::string, std::string> _params;
 
         //!@{
@@ -236,25 +241,12 @@ namespace ogmaneo {
         void load(const ogmaneo::schemas::InputLayer* fbInputLayer, ComputeSystem &cs);
         flatbuffers::Offset<ogmaneo::schemas::InputLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
         //!@}
+
+        friend class Architect;
     };
 
-    struct ActionLayer {
-        Vec2i _size;
-
-        Vec2i _tileSize;
-
-        std::unordered_map<std::string, std::string> _params;
-
-        //!@{
-        /*!
-        \brief Serialization
-        */
-        void load(const ogmaneo::schemas::ActionLayer* fbActionLayer, ComputeSystem &cs);
-        flatbuffers::Offset<ogmaneo::schemas::ActionLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
-        //!@}
-    };
-
-    struct HigherLayer {
+    class HigherLayer {
+    private:
         Vec2i _size;
 
         SparseFeaturesType _type;
@@ -268,6 +260,8 @@ namespace ogmaneo {
         void load(const ogmaneo::schemas::HigherLayer* fbHigherLayer, ComputeSystem &cs);
         flatbuffers::Offset<ogmaneo::schemas::HigherLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
         //!@}
+
+        friend class Architect;
     };
 
     /*!
@@ -277,7 +271,6 @@ namespace ogmaneo {
     class OGMA_API Architect {
     private:
         std::vector<InputLayer> _inputLayers;
-        std::vector<ActionLayer> _actionLayers;
         std::vector<HigherLayer> _higherLayers;
 
         std::mt19937 _rng;
@@ -298,8 +291,7 @@ namespace ogmaneo {
     public:
         void initialize(unsigned int seed, const std::shared_ptr<Resources> &resources);
 
-        ParameterModifier addInputLayer(const Vec2i &size);
-        ParameterModifier addActionLayer(const Vec2i &size, const Vec2i &tileSize);
+        ParameterModifier addInputLayer(const Vec2i &size, bool isQ = false, Vec2i chunkSize = Vec2i(1, 1));
 
         ParameterModifier addHigherLayer(const Vec2i &size, SparseFeaturesType type);
 
@@ -308,13 +300,7 @@ namespace ogmaneo {
             return generateHierarchy(emptyHierarchy);
         }
 
-        std::shared_ptr<class Agent> generateAgent() {
-            std::unordered_map<std::string, std::string> emptyAgentHierarchy;
-            return generateAgent(emptyAgentHierarchy);
-        }
-
         std::shared_ptr<class Hierarchy> generateHierarchy(std::unordered_map<std::string, std::string> &additionalParams);
-        std::shared_ptr<class Agent> generateAgent(std::unordered_map<std::string, std::string> &additionalParams);
 
         //!@{
         /*!

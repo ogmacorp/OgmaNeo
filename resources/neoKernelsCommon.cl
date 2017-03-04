@@ -12,26 +12,6 @@ constant sampler_t defaultSampler = CLK_NORMALIZED_COORDS_FALSE |
     CLK_ADDRESS_CLAMP |
     CLK_FILTER_NEAREST;
 
-constant sampler_t normalizedClampedNearestSampler = CLK_NORMALIZED_COORDS_TRUE |
-    CLK_ADDRESS_CLAMP |
-    CLK_FILTER_NEAREST;
-
-constant sampler_t normalizedClampedToEdgeNearestSampler = CLK_NORMALIZED_COORDS_TRUE |
-    CLK_ADDRESS_CLAMP |
-    CLK_FILTER_NEAREST;
-
-constant sampler_t unnormalizedClampedNearestSampler = CLK_NORMALIZED_COORDS_FALSE |
-    CLK_ADDRESS_CLAMP |
-    CLK_FILTER_NEAREST;
-
-constant sampler_t defaultNormalizedSampler = CLK_NORMALIZED_COORDS_TRUE |
-    CLK_ADDRESS_CLAMP |
-    CLK_FILTER_NEAREST;
-
-constant sampler_t defaultUnnormalizedSampler = CLK_NORMALIZED_COORDS_FALSE |
-    CLK_ADDRESS_CLAMP |
-    CLK_FILTER_NEAREST;
-
 // ----------------------------------------- Common -----------------------------------------
 
 float randFloat(uint2* state) {
@@ -80,86 +60,37 @@ bool inBounds(int2 position, int2 lowerBound, int2 upperBound) {
 }
 
 int2 project(int2 position, float2 toScalars) {
-    return (int2)((position.x + 0.5f) * toScalars.x, (position.y + 0.5f) * toScalars.y);
+    return (int2)((position.x + 0.5f) * toScalars.x + 0.5f, (position.y + 0.5f) * toScalars.y + 0.5f);
 }
 
 int2 projectf(float2 position, float2 toScalars) {
-    return (int2)(position.x * toScalars.x, position.y * toScalars.y);
+    return (int2)((position.x + 0.5f) * toScalars.x + 0.5f, (position.y + 0.5f) * toScalars.y + 0.5f);
 }
 
-// Initialize a random uniform 2D image (X field)
-void kernel randomUniform2D(write_only image2d_t values, uint2 seed, float2 minMax) {
+// Initialize a random uniform 2D image
+void kernel randomUniform2D(write_only image2d_t values, uint2 seed, float4 lowerBounds, float4 upperBounds, float4 mask, float4 fillConstants) {
     uint2 seedValue = seed + (uint2)(get_global_id(0) * 29 + 12, get_global_id(1) * 16 + 23) * 36;
 
     int2 position = (int2)(get_global_id(0), get_global_id(1));
 
-    float value = randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x;
+    float4 randVal = (float4)(randFloat(&seedValue) * (upperBounds.x - lowerBounds.x) + lowerBounds.x,
+		randFloat(&seedValue) * (upperBounds.y - lowerBounds.y) + lowerBounds.y,
+		randFloat(&seedValue) * (upperBounds.z - lowerBounds.z) + lowerBounds.z,
+		randFloat(&seedValue) * (upperBounds.w - lowerBounds.w) + lowerBounds.w);
 
-    write_imagef(values, position, (float4)(value, 0.0f, 0.0f, 0.0f));
+    write_imagef(values, position, mask * randVal + (1.0f - mask) * fillConstants);
 }
 
-// Initialize a random uniform 3D image (X field)
-void kernel randomUniform3D(write_only image3d_t values, uint2 seed, float2 minMax) {
+// Initialize a random uniform 3D image
+void kernel randomUniform3D(write_only image3d_t values, uint2 seed, float4 lowerBounds, float4 upperBounds, float4 mask, float4 fillConstants) {
     uint2 seedValue = seed + (uint2)(get_global_id(0) * 12 + 76 + get_global_id(2) * 3, get_global_id(1) * 21 + 42 + get_global_id(2) * 7) * 12;
 
     int3 position = (int3)(get_global_id(0), get_global_id(1), get_global_id(2));
 
-    float value = randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x;
+    float4 randVal = (float4)(randFloat(&seedValue) * (upperBounds.x - lowerBounds.x) + lowerBounds.x,
+		randFloat(&seedValue) * (upperBounds.y - lowerBounds.y) + lowerBounds.y,
+		randFloat(&seedValue) * (upperBounds.z - lowerBounds.z) + lowerBounds.z,
+		randFloat(&seedValue) * (upperBounds.w - lowerBounds.w) + lowerBounds.w);
 
-    write_imagef(values, (int4)(position, 0), (float4)(value, 0.0f, 0.0f, 0.0f));
-}
-
-// Initialize a random uniform 2D image (XY fields)
-void kernel randomUniform2DXY(write_only image2d_t values, uint2 seed, float2 minMax) {
-    uint2 seedValue = seed + (uint2)(get_global_id(0) * 15 + 66, get_global_id(1) * 61 + 2) * 56;
-
-    int2 position = (int2)(get_global_id(0), get_global_id(1));
-
-    float2 v = (float2)(randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x, randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x);
-
-    write_imagef(values, position, (float4)(v.x, v.y, 0.0f, 0.0f));
-}
-
-// Initialize a random uniform 2D image (XYZ fields)
-void kernel randomUniform2DXYZ(write_only image2d_t values, uint2 seed, float2 minMax) {
-    uint2 seedValue = seed + (uint2)(get_global_id(0) * 15 + 66, get_global_id(1) * 61 + 2) * 56;
-
-    int2 position = (int2)(get_global_id(0), get_global_id(1));
-
-    float3 v = (float3)(randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x, randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x, randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x);
-
-    write_imagef(values, position, (float4)(v.x, v.y, v.z, 0.0f));
-}
-
-// Initialize a random uniform 2D image (XZ fields)
-void kernel randomUniform2DXZ(write_only image2d_t values, uint2 seed, float2 minMax) {
-    uint2 seedValue = seed + (uint2)(get_global_id(0) * 29 + 12, get_global_id(1) * 16 + 23) * 36;
-
-    int2 position = (int2)(get_global_id(0), get_global_id(1));
-
-    float2 v = (float2)(randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x, randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x);
-
-    write_imagef(values, position, (float4)(v.x, 0.0f, v.y, 0.0f));
-}
-
-// Initialize a random uniform 3D image (XY fields)
-void kernel randomUniform3DXY(write_only image3d_t values, uint2 seed, float2 minMax) {
-    uint2 seedValue = seed + (uint2)(get_global_id(0) * 12 + 76 + get_global_id(2) * 3, get_global_id(1) * 21 + 42 + get_global_id(2) * 7) * 12;
-
-    int3 position = (int3)(get_global_id(0), get_global_id(1), get_global_id(2));
-
-    float2 v = (float2)(randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x, randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x);
-
-    write_imagef(values, (int4)(position, 0), (float4)(v.x, v.y, 0.0f, 0.0f));
-}
-
-// Initialize a random uniform 3D image (XZ fields)
-void kernel randomUniform3DXZ(write_only image3d_t values, uint2 seed, float2 minMax) {
-    uint2 seedValue = seed + (uint2)(get_global_id(0) * 12 + 76 + get_global_id(2) * 3, get_global_id(1) * 21 + 42 + get_global_id(2) * 7) * 12;
-
-    int3 position = (int3)(get_global_id(0), get_global_id(1), get_global_id(2));
-
-    float2 v = (float2)(randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x, randFloat(&seedValue) * (minMax.y - minMax.x) + minMax.x);
-
-    write_imagef(values, (int4)(position, 0), (float4)(v.x, 0.0f, v.y, 0.0f));
+    write_imagef(values, (int4)(position, 0), mask * randVal + (1.0f - mask) * fillConstants);
 }
