@@ -12,97 +12,65 @@
 
 using namespace ogmaneo;
 
-void Hierarchy::simStep(std::vector<ValueField2D> &inputs, bool learn) {
+void Hierarchy::activate(std::vector<ValueField2D> &inputsFeed) {
     // Write input
-    for (int i = 0; i < _inputImages.size(); i++)
-        _resources->_cs->getQueue().enqueueWriteImage(_inputImages[i], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(inputs[i].getSize().x), static_cast<cl::size_type>(inputs[i].getSize().y), 1 }, 0, 0, inputs[i].getData().data());
+    for (int i = 0; i < _inputImagesFeed.size(); i++)
+        _resources->_cs->getQueue().enqueueWriteImage(_inputImagesFeed[i], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(inputsFeed[i].getSize().x), static_cast<cl::size_type>(inputsFeed[i].getSize().y), 1 }, 0, 0, inputsFeed[i].getData().data());
 
-    _p.simStep(*_resources->_cs, _inputImages, _inputImages, _rng, learn);
+    _p.activate(*_resources->_cs, _inputImagesFeed, _rng);
 
     // Get predictions
     for (int i = 0; i < _predictions.size(); i++) {
-        _readoutLayers[i].activate(*_resources->_cs, { _p.getHiddenPrediction()[_back] }, _rng);
-
-        if (learn)
-            _readoutLayers[i].learn(*_resources->_cs, _inputImages[i]);
-
-        _readoutLayers[i].stepEnd(*_resources->_cs);
-
-        _resources->_cs->getQueue().enqueueReadImage(_readoutLayers[i].getHiddenStates()[_back], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(_predictions[i].getSize().x), static_cast<cl::size_type>(_predictions[i].getSize().y), 1 }, 0, 0, _predictions[i].getData().data());
+        _resources->_cs->getQueue().enqueueReadImage(_p.getPredictions(i)[_back], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(_predictions[i].getSize().x), static_cast<cl::size_type>(_predictions[i].getSize().y), 1 }, 0, 0, _predictions[i].getData().data());
     }
 }
 
-void Hierarchy::simStep(std::vector<ValueField2D> &inputs, std::vector<ValueField2D> &corruptedInputs, bool learn) {
+void Hierarchy::learn(std::vector<ValueField2D> &inputsPredict, float tdError) {
     // Write input
-    for (int i = 0; i < _inputImages.size(); i++)
-        _resources->_cs->getQueue().enqueueWriteImage(_inputImages[i], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(inputs[i].getSize().x), static_cast<cl::size_type>(inputs[i].getSize().y), 1 }, 0, 0, inputs[i].getData().data());
+    for (int i = 0; i < _inputImagesPredict.size(); i++)
+        _resources->_cs->getQueue().enqueueWriteImage(_inputImagesPredict[i], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(inputsPredict[i].getSize().x), static_cast<cl::size_type>(inputsPredict[i].getSize().y), 1 }, 0, 0, inputsPredict[i].getData().data());
 
-    for (int i = 0; i < _corruptedInputImages.size(); i++)
-        _resources->_cs->getQueue().enqueueWriteImage(_corruptedInputImages[i], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(corruptedInputs[i].getSize().x), static_cast<cl::size_type>(corruptedInputs[i].getSize().y), 1 }, 0, 0, corruptedInputs[i].getData().data());
-
-    _p.simStep(*_resources->_cs, _inputImages, _corruptedInputImages, _rng, learn);
-
-    // Get predictions
-    for (int i = 0; i < _predictions.size(); i++) {
-        _readoutLayers[i].activate(*_resources->_cs, { _p.getHiddenPrediction()[_back] }, _rng);
-
-        if (learn)
-            _readoutLayers[i].learn(*_resources->_cs, _inputImages[i]);
-
-        _readoutLayers[i].stepEnd(*_resources->_cs);
-
-        _resources->_cs->getQueue().enqueueReadImage(_readoutLayers[i].getHiddenStates()[_back], CL_TRUE, { 0, 0, 0 }, { static_cast<cl::size_type>(_predictions[i].getSize().x), static_cast<cl::size_type>(_predictions[i].getSize().y), 1 }, 0, 0, _predictions[i].getData().data());
-    }
+    _p.learn(*_resources->_cs, _inputImagesPredict, _rng, tdError);
 }
 
 void Hierarchy::load(const schemas::Hierarchy* fbHierarchy, ComputeSystem &cs) {
-    assert(_inputImages.size() == fbHierarchy->_inputImages()->Length());
-    assert(_corruptedInputImages.size() == fbHierarchy->_corruptedInputImages()->Length());
+    assert(_inputImagesFeed.size() == fbHierarchy->_inputImagesFeed()->Length());
+    assert(_inputImagesPredict.size() == fbHierarchy->_inputImagesPredict()->Length());
     assert(_predictions.size() == fbHierarchy->_predictions()->Length());
-    assert(_readoutLayers.size() == fbHierarchy->_readoutLayers()->Length());
 
     _p.load(fbHierarchy->_p(), cs);
 
-    for (flatbuffers::uoffset_t i = 0; i < fbHierarchy->_inputImages()->Length(); i++) {
-        ogmaneo::load(_inputImages[i], fbHierarchy->_inputImages()->Get(i), cs);
+    for (flatbuffers::uoffset_t i = 0; i < fbHierarchy->_inputImagesFeed()->Length(); i++) {
+        ogmaneo::load(_inputImagesFeed[i], fbHierarchy->_inputImagesFeed()->Get(i), cs);
     }
 
-    for (flatbuffers::uoffset_t i = 0; i < fbHierarchy->_corruptedInputImages()->Length(); i++) {
-        ogmaneo::load(_corruptedInputImages[i], fbHierarchy->_corruptedInputImages()->Get(i), cs);
+    for (flatbuffers::uoffset_t i = 0; i < fbHierarchy->_inputImagesPredict()->Length(); i++) {
+        ogmaneo::load(_inputImagesPredict[i], fbHierarchy->_inputImagesPredict()->Get(i), cs);
     }
 
     for (flatbuffers::uoffset_t i = 0; i < fbHierarchy->_predictions()->Length(); i++) {
         _predictions[i].load(fbHierarchy->_predictions()->Get(i), cs);
     }
-
-    for (flatbuffers::uoffset_t i = 0; i < fbHierarchy->_readoutLayers()->Length(); i++) {
-        _readoutLayers[i].load(fbHierarchy->_readoutLayers()->Get(i), cs);
-    }
 }
 
 flatbuffers::Offset<schemas::Hierarchy> Hierarchy::save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs) {
-    std::vector<flatbuffers::Offset<schemas::Image2D>> inputImages;
-    for (cl::Image2D image : _inputImages)
-        inputImages.push_back(ogmaneo::save(image, builder, cs));
+    std::vector<flatbuffers::Offset<schemas::Image2D>> inputImagesFeed;
+    for (cl::Image2D image : _inputImagesFeed)
+        inputImagesFeed.push_back(ogmaneo::save(image, builder, cs));
 
-    std::vector<flatbuffers::Offset<schemas::Image2D>> corruptedInputImages;
-    for (cl::Image2D image : _corruptedInputImages)
-        corruptedInputImages.push_back(ogmaneo::save(image, builder, cs));
+    std::vector<flatbuffers::Offset<schemas::Image2D>> inputImagesPredict;
+    for (cl::Image2D image : _inputImagesPredict)
+        inputImagesPredict.push_back(ogmaneo::save(image, builder, cs));
 
     std::vector<flatbuffers::Offset<schemas::ValueField2D>> predictions;
     for (ValueField2D values : _predictions)
         predictions.push_back(values.save(builder, cs));
 
-    std::vector<flatbuffers::Offset<schemas::PredictorLayer>> readoutLayers;
-    for (PredictorLayer layer : _readoutLayers)
-        readoutLayers.push_back(layer.save(builder, cs));
-
     return schemas::CreateHierarchy(builder,
         _p.save(builder, cs),
-        builder.CreateVector(inputImages),
-        builder.CreateVector(corruptedInputImages),
-        builder.CreateVector(predictions),
-        builder.CreateVector(readoutLayers));
+        builder.CreateVector(inputImagesFeed),
+        builder.CreateVector(inputImagesPredict),
+        builder.CreateVector(predictions));
 }
 
 void Hierarchy::load(ComputeSystem &cs, const std::string &fileName) {

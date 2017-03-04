@@ -19,8 +19,6 @@ table FeatureHierarchyLayerDesc {
 table FeatureHierarchyLayer {
 	_sf:SparseFeaturesType;
     _clock:int;
-    _tpBuffer:DoubleBuffer2D;
-    _predErrors:Image2D;
     _tpReset:bool;
     _tpNextReset:bool;
 }

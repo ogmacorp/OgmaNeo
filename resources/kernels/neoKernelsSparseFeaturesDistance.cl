@@ -5,7 +5,7 @@
 
 // ----------------------------------------- Sparse Features -----------------------------------------
 
-void kernel sfcAddSample(read_only image2d_t visibleStates,
+void kernel sfdAddSample(read_only image2d_t visibleStates,
     read_only image3d_t samplesBack, write_only image3d_t samplesFront,
     int numSamples)
 {
@@ -22,7 +22,7 @@ void kernel sfcAddSample(read_only image2d_t visibleStates,
     write_imagef(samplesFront, (int4)(position.x, position.y, 0, 0), (float4)(visibleState, 0.0f, 0.0f, 0.0f));
 }
 
-void kernel sfcStimulus(read_only image3d_t samples,
+void kernel sfdStimulus(read_only image3d_t samples,
 	read_only image2d_t hiddenSummationTempBack, write_only image2d_t hiddenSummationTempFront,
 	read_only image3d_t weights,
 	int2 visibleSize, float2 chunkToVisible, int2 chunkSize, int radius, int numSamples, uchar ignoreMiddle)
@@ -56,7 +56,9 @@ void kernel sfcStimulus(read_only image3d_t samples,
 
 					float sample = read_imagef(samples, defaultSampler, (int4)(visiblePosition.x, visiblePosition.y, s, 0)).x;
 					
-					subSum += sample * weight;
+					float delta = sample - weight;
+					
+					subSum += -delta * delta;
 				}
 			}
 	}
@@ -64,20 +66,23 @@ void kernel sfcStimulus(read_only image3d_t samples,
     write_imagef(hiddenSummationTempFront, hiddenPosition, (float4)(sum + subSum, 0.0f, 0.0f, 0.0f));
 }
 
-void kernel sfcActivate(read_only image2d_t hiddenStimuli, read_only image2d_t hiddenStatesPrev,
+void kernel sfdActivate(read_only image2d_t hiddenStimuli, read_only image2d_t hiddenStatesPrev,
 	write_only image2d_t hiddenActivationsFront)
 {
 	int2 hiddenPosition = (int2)(get_global_id(0), get_global_id(1));
 	
 	float hiddenStimulus = read_imagef(hiddenStimuli, defaultSampler, hiddenPosition).x;
-
-	write_imagef(hiddenActivationsFront, hiddenPosition, (float4)(hiddenStimulus, 0.0f, 0.0f, 0.0f));
+	
+	float tracePrev = read_imagef(hiddenStatesPrev, defaultSampler, hiddenPosition).y;
+	
+	write_imagef(hiddenActivationsFront, hiddenPosition, (float4)(hiddenStimulus, 0.0f, 0.0f, 0.0f)); // + 1.0f / fmax(1.0f, tracePrev)
 }
 
-void kernel sfcInhibit(read_only image2d_t activations,
+void kernel sfdInhibit(read_only image2d_t activations,
+	read_only image2d_t hiddenStatesBack,
 	write_only image2d_t hiddenStatesFront,
 	write_only image2d_t chunkWinners,
-	int2 hiddenSize, int2 chunkSize)
+	int2 hiddenSize, int2 chunkSize, float gamma)
 {
 	int2 chunkPosition = (int2)(get_global_id(0), get_global_id(1));
 	
@@ -108,14 +113,18 @@ void kernel sfcInhibit(read_only image2d_t activations,
 			int2 hiddenPosition = hiddenStartPosition + (int2)(dx, dy);
 
 			if (inBounds0(hiddenPosition, hiddenSize)) {
+				float tracePrev = read_imagef(hiddenStatesBack, defaultSampler, hiddenPosition).y;
+
+				float neighbor = (abs(maxDelta.x - dx) + abs(maxDelta.y - dy)) <= 1 ? 1.0f : 0.0f;
+				
 				float hiddenState = (dx == maxDelta.x && dy == maxDelta.y) ? 1.0f : 0.0f;
 
-				write_imagef(hiddenStatesFront, hiddenPosition, (float4)(hiddenState, 0.0f, 0.0f, 0.0f));
+				write_imagef(hiddenStatesFront, hiddenPosition, (float4)(hiddenState, fmin(99999.0f, tracePrev * gamma + neighbor), 0.0f, 0.0f));
 			}
 		}
 }
 
-void kernel sfcInhibitOther(read_only image2d_t activations,
+void kernel sfdInhibitOther(read_only image2d_t activations,
 	write_only image2d_t hiddenStatesFront,
 	int2 hiddenSize, int2 chunkSize)
 {
@@ -153,11 +162,11 @@ void kernel sfcInhibitOther(read_only image2d_t activations,
 		}
 }
 
-void kernel sfcLearnWeights(read_only image2d_t chunkWinners,
+void kernel sfdLearnWeights(read_only image2d_t chunkWinners,
 	read_only image2d_t hiddenStates,
     read_only image3d_t samples,
 	read_only image3d_t weightsBack, write_only image3d_t weightsFront,
-	int2 hiddenSize, int2 visibleSize, float2 chunkToVisible, int2 chunkSize, int radius, float weightAlpha, int numSamples, float gamma)
+	int2 hiddenSize, int2 visibleSize, float2 chunkToVisible, int2 chunkSize, int radius, float weightAlpha, int numSamples)
 {
 	int2 hiddenPosition = (int2)(get_global_id(0), get_global_id(1));
 
@@ -173,7 +182,9 @@ void kernel sfcLearnWeights(read_only image2d_t chunkWinners,
 	
 	int2 delta = chunkPosition * chunkSize + chunkWinner - hiddenPosition;
 	
-	float update = (delta.x == 0 && delta.y == 0) ? 1.0f : 0.0f;
+	float trace = read_imagef(hiddenStates, defaultSampler, hiddenPosition).y;
+	
+	float update = (abs(delta.x) + abs(delta.y)) <= 1 ? 1.0f / fmax(1.0f, trace) : 0.0f;
 	
 	for (int s = 0; s < numSamples; s++) {
 		for (int dx = -radius; dx <= radius; dx++)
@@ -189,7 +200,7 @@ void kernel sfcLearnWeights(read_only image2d_t chunkWinners,
 
 					float sample = read_imagef(samples, defaultSampler, (int4)(visiblePosition.x, visiblePosition.y, s, 0)).x;
 					
-					float weight = weightPrev + weightAlpha * update * (fmin(sample, weightPrev) - weightPrev);
+					float weight = weightPrev + weightAlpha * update * (sample - weightPrev);
 					
 					write_imagef(weightsFront, (int4)(hiddenPosition.x, hiddenPosition.y, wi, 0), (float4)(weight, 0.0f, 0.0f, 0.0f));
 				}
@@ -197,7 +208,7 @@ void kernel sfcLearnWeights(read_only image2d_t chunkWinners,
 	}
 }
 
-void kernel sfcDeriveInputs(read_only image2d_t inputs, read_only image2d_t outputsBack, write_only image2d_t outputsFront, float lambda) {
+void kernel sfdDeriveInputs(read_only image2d_t inputs, read_only image2d_t outputsBack, write_only image2d_t outputsFront, float lambda) {
 	int2 position = (int2)(get_global_id(0), get_global_id(1));
 
 	float input = read_imagef(inputs, defaultSampler, position).x;
@@ -206,10 +217,10 @@ void kernel sfcDeriveInputs(read_only image2d_t inputs, read_only image2d_t outp
 		
 	float trace = lambda * tracePrev + (1.0f - lambda) * input;
 		
-    write_imagef(outputsFront, position, (float4)(input - tracePrev, trace, 0.0f, 0.0f));
+	write_imagef(outputsFront, position, (float4)(input, trace, 0.0f, 0.0f));
 }
 
-void kernel sfcSum(read_only image2d_t inputs, read_only image2d_t outputsBack, write_only image2d_t outputsFront) {
+void kernel sfdSum(read_only image2d_t inputs, read_only image2d_t outputsBack, write_only image2d_t outputsFront) {
 	int2 position = (int2)(get_global_id(0), get_global_id(1));
 
 	float input = read_imagef(inputs, defaultSampler, position).x;
@@ -219,7 +230,7 @@ void kernel sfcSum(read_only image2d_t inputs, read_only image2d_t outputsBack, 
 	write_imagef(outputsFront, position, (float4)(sumPrev + input, 0.0f, 0.0f, 0.0f));
 }
 
-void kernel sfcSlice(read_only image3d_t samples,
+void kernel sfdSlice(read_only image3d_t samples,
     write_only image2d_t slice,
     int index)
 {

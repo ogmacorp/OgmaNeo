@@ -8,7 +8,9 @@
 
 # OgmaNeo
 
-## Introduction
+[![Join the chat at https://gitter.im/ogmaneo/Lobby](https://img.shields.io/gitter/room/nwjs/nw.js.svg)](https://gitter.im/ogmaneo/Lobby) [![Build Status](https://travis-ci.org/ogmacorp/OgmaNeo.svg?branch=master)](https://travis-ci.org/ogmacorp/OgmaNeo)
+
+## Introduction 
 
 Welcome to [Ogma](https://ogmacorp.com) OgmaNeo library. A C++ library that contains implementation(s) of Online Predictive Hierarchies, as described in the arXiv.org paper: [Feynman Machine: The Universal Dynamical Systems Computer](http://arxiv.org/abs/1609.03971).
 
@@ -69,7 +71,9 @@ You can then step the simulation with:
 
 ```cpp
     // Fill the inputField and step the simulation
-    hierarchy->simStep(std::vector<ogmaneo::ValueField2D>{ inputField }, true);
+    hierarchy->activate(std::vector<ogmaneo::ValueField2D>{ inputField });
+
+    hierarchy->learn(std::vector<ogmaneo::ValueField2D>{ inputField });
 
 	// Retrieve the prediction (same dimensions as the input field)
     predField = hierarchy->getPredictions().front();
@@ -107,83 +111,32 @@ Hierarchy layers (prefix 'hl'):
  - hl_poolSteps (int): Number of steps to perform temporal pooling over, 1 means no pooling.
 
 Predictor (prefix 'p'):
- - p_alpha (float): Learning rate.
+ - p_alpha (float): Current layer prediction learning rate.
+ - p_beta (float): Feed back learning rate.
  - p_radius (int): Input field radius (onto hidden layers).
-
-Input layers (prefix 'in'):
- - Prediction (readout) layers (prefix 'p'):
-    - in_p_alpha (float): Learning rate.
-    - in_p_radius (int): Input field radius (onto first hidden layer).
-
-Agent layers (prefix 'a'):
- - a_radius (int): Input field radius (onto previous action layer).
- - a_qAlpha (float): Q learning rate.
- - a_qGamma (float): Q gamma (discount factor).
- - a_qLambda (float): Q lambda (trace decay factor).
- - a_epsilon (float): Random threshold for action exploration.
- - a_chunkSize (int, int): Size of a chunk.
- - a_chunkGamma (float): Falloff (higher means faster) for SOM neighborhood radius.
+ - p_lambda (int): TD lambda, for reinforcement learning (if enabled).
 
 ### Encoders
 
-Sparse features STDP (prefix 'sfs'):
- - sfs_inhibitionRadius (int): Inhibitory (lateral) radius.
- - sfs_initWeightRange (float, float): Weight initialization range.
- - sfs_biasAlpha (float): Bias learning rate.
- - sfs_activeRatio (float): Ratio of active units (inverse of sparsity).
- - sfs_gamma (float): State trace decay (used for temporal sparsity management).
- - Feed forward inputs (prefix 'ff'):
-    - sfs_ff_radius (int): Radius onto feed forward inputs.
-    - sfs_ff_weightAlpha (float): Learning rate for feed forward inputs.
-    - sfs_ff_lambda (float): Input trace decay for feed forward inputs.  
- - Recurrent inputs (prefix 'r'):
-    - sfs_r_radius (int): Radius onto feed recurrent inputs.
-    - sfs_r_weightAlpha (float): Learning rate for recurrent inputs.
-    - sfs_r_lambda (float): Input trace decay for recurrent inputs.
-
-Sparse features Delay (prefix 'sfd'):
- - sfd_inhibitionRadius (int): Inhibitory (lateral) radius.
- - sfd_initWeightRange (float, float): Weight initialization range.
- - sfd_biasAlpha (float): Bias learning rate.
- - sfd_activeRatio (float): Ratio of active units (inverse of sparsity).
- - Feed forward inputs (prefix 'ff'):
-    - sfd_ff_radius (int): Radius onto feed forward inputs.
-    - sfd_ff_weightAlpha (float): Learning rate for feed forward inputs.
-    - sfd_ff_lambda (float): Fast synaptic decay for feed forward inputs.
-    - sfd_ff_gamma (float): Long synaptic decay for feed forward inputs.
-
 Sparse features Chunk (prefix 'sfc'):
  - sfc_chunkSize (int, int): Size of a chunk.
+ - sfc_gamma (float): Small boosting factor.
  - sfc_initWeightRange (float, float): Weight initialization range.
- - sfc_numSamples (int): Number of temporally extended samples (1 means no additional samples).
  - Feed forward inputs (prefix 'ff'):
+    - sfc_ff_numSamples (int): Number of temporally extended samples (1 means no additional samples). Should be around 2 * hl_poolsteps
     - sfc_ff_radius (int): Radius onto feed forward inputs.
     - sfc_ff_weightAlpha (float): Learning rate for feed forward inputs.
     - sfc_ff_lambda (float): Input trace decay for feed forward inputs.  
- - Recurrent inputs (prefix 'r'):
-    - sfc_r_radius (int): Radius onto recurrent inputs.
-    - sfc_r_weightAlpha (float): Learning rate for recurrent inputs.
-    - sfc_r_lambda (float): Input trace decay for recurrent inputs.
 
-Sparse features ReLU (prefix 'sfr')
- - sfr_initWeightRange (float, float): Weight initialization range.
- - sfr_numSamples (int): Number of temporally extended samples (1 means no additional samples).
- - sfr_lateralRadius (int): Inhibitory (lateral) radius.
- - sfr_gamma (float): State trace decay (used for temporal sparsity management).
- - sfr_activeRatio (float): Ratio of active units (inverse of sparsity).
- - sfr_biasAlpha (float): Learning rate of hidden unit biases (for maintaining sparsity).
- - Feed forward (prefix 'ff'):  
-    - sfr_ff_radius_hidden (int): Radius onto feed forward oututs.
-    - sfr_ff_radius_visible (int): Radius onto feed forward inputs.
-    - sfr_ff_weightAlpha_hidden (float): Learning rate for feed forward outputs.
-    - sfr_ff_weightAlpha_visible (float): Learning rate for feed forward inputs.
-    - sfr_ff_lambda (float): Input trace decay for feed forward inputs.  
- - Recurrent (prefix 'r'):
-    - sfr_r_radius_hidden (int): Radius onto recurrent outputs.
-    - sfr_r_radius_visible (int): Radius onto recurrent inputs.
-    - sfr_r_weightAlpha_hidden (float): Learning rate for recurrent outputs.
-    - sfr_r_weightAlpha_visible (float): Learning rate for recurrent inputs.
-    - sfr_r_lambda (float): Input trace decay for recurrent inputs.
+Sparse features Distance (prefix 'sfd'):
+ - sfd_chunkSize (int, int): Size of a chunk.
+ - sfd_gamma (float): Decay of inverse learning rates. Should be below but close to 1.
+ - sfd_initWeightRange (float, float): Weight initialization range.
+ - Feed forward inputs (prefix 'ff'):
+    - sfd_ff_numSamples (int): Number of temporally extended samples (1 means no additional samples). Should be around 2 * hl_poolsteps
+    - sfd_ff_radius (int): Radius onto feed forward inputs.
+    - sfd_ff_weightAlpha (float): Learning rate for feed forward inputs.
+    - sfd_ff_lambda (float): Input trace decay for feed forward inputs.  
 
 ## Requirements
 
@@ -222,8 +175,6 @@ The OgmaNeo CMake build system uses the `CMake\FindFlatBuffers.cmake` script to 
 If you do not already have the Flatbuffers package installed, the OgmaNeo CMakeLists.txt script will automatically download and build the package into a `3rdparty` directory local to the build.
 
 ## Building
-
-[![Build Status](https://travis-ci.org/ogmacorp/OgmaNeo.svg?branch=master)](https://travis-ci.org/ogmacorp/OgmaNeo)
 
 The following commands can be used to build the OgmaNeo library:
 

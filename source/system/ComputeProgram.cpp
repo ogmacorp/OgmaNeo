@@ -14,14 +14,10 @@
 
 #include "kernels/neoKernelsHierarchy.h"
 #include "kernels/neoKernelsPredictor.h"
-#include "kernels/neoKernelsAgentSwarm.h"
-#include "kernels/neoKernelsExtra.h"
 
 // Add additional encoders here
 #include "kernels/neoKernelsSparseFeaturesChunk.h"
-#include "kernels/neoKernelsSparseFeaturesDelay.h"
-#include "kernels/neoKernelsSparseFeaturesSTDP.h"
-#include "kernels/neoKernelsSparseFeaturesReLU.h"
+#include "kernels/neoKernelsSparseFeaturesDistance.h"
 
 using namespace ogmaneo;
 
@@ -41,40 +37,10 @@ bool ComputeProgram::loadPredictorKernel(ComputeSystem &cs) {
     return loadFromString(kernel, cs);
 }
 
-bool ComputeProgram::loadAgentSwarmKernel(ComputeSystem &cs) {
-    std::string kernel = std::accumulate(
-        neoKernelsAgentSwarm_ocl, neoKernelsAgentSwarm_ocl + sizeof(neoKernelsAgentSwarm_ocl) / sizeof(neoKernelsAgentSwarm_ocl[0]),
-        std::string(""));
-
-    return loadFromString(kernel, cs);
-}
-
-bool ComputeProgram::loadExtraKernel(ComputeSystem &cs) {
-    std::string kernel = std::accumulate(
-        neoKernelsExtra_ocl, neoKernelsExtra_ocl + sizeof(neoKernelsExtra_ocl) / sizeof(neoKernelsExtra_ocl[0]),
-        std::string(""));
-
-    return loadFromString(kernel, cs);
-}
-
 bool ComputeProgram::loadSparseFeaturesKernel(ComputeSystem &cs, SparseFeaturesType type) {
     std::string kernel;
     
     switch (type) {
-    case _stdp:
-        kernel = std::accumulate(
-            neoKernelsSparseFeaturesSTDP_ocl, neoKernelsSparseFeaturesSTDP_ocl + sizeof(neoKernelsSparseFeaturesSTDP_ocl) / sizeof(neoKernelsSparseFeaturesSTDP_ocl[0]),
-            std::string(""));
-
-        break;
-
-    case _delay:
-        kernel = std::accumulate(
-            neoKernelsSparseFeaturesDelay_ocl, neoKernelsSparseFeaturesDelay_ocl + sizeof(neoKernelsSparseFeaturesDelay_ocl) / sizeof(neoKernelsSparseFeaturesDelay_ocl[0]),
-            std::string(""));
-
-        break;
-
     case _chunk:
         kernel = std::accumulate(
             neoKernelsSparseFeaturesChunk_ocl, neoKernelsSparseFeaturesChunk_ocl + sizeof(neoKernelsSparseFeaturesChunk_ocl) / sizeof(neoKernelsSparseFeaturesChunk_ocl[0]),
@@ -82,9 +48,9 @@ bool ComputeProgram::loadSparseFeaturesKernel(ComputeSystem &cs, SparseFeaturesT
 
         break;
 
-    case _ReLU:
+    case _distance:
         kernel = std::accumulate(
-            neoKernelsSparseFeaturesReLU_ocl, neoKernelsSparseFeaturesReLU_ocl + sizeof(neoKernelsSparseFeaturesReLU_ocl) / sizeof(neoKernelsSparseFeaturesReLU_ocl[0]),
+            neoKernelsSparseFeaturesDistance_ocl, neoKernelsSparseFeaturesDistance_ocl + sizeof(neoKernelsSparseFeaturesDistance_ocl) / sizeof(neoKernelsSparseFeaturesDistance_ocl[0]),
             std::string(""));
 
         break;

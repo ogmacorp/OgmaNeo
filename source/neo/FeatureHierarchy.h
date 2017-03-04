@@ -29,7 +29,7 @@ namespace ogmaneo {
             std::shared_ptr<SparseFeatures::SparseFeaturesDesc> _sfDesc;
 
             /*!
-            \brief Temporal pooling
+            \brief Stride length
             */
             int _poolSteps;
 
@@ -59,19 +59,9 @@ namespace ogmaneo {
             std::shared_ptr<SparseFeatures> _sf;
 
             /*!
-            \brief Clock for temporal pooling (relative to previous layer)
+            \brief Clock for striding (relative to previous layer)
             */
             int _clock;
-
-            /*!
-            \brief Temporal pooling buffer
-            */
-            DoubleBuffer2D _tpBuffer;
-
-            /*!
-            \brief Prediction error temporary buffer
-            */
-            cl::Image2D _predErrors;
 
             //!@{
             /*!
@@ -106,14 +96,6 @@ namespace ogmaneo {
         std::vector<LayerDesc> _layerDescs;
         //!@}
 
-        //!@{
-        /*!
-        \brief Additional kernels
-        */
-        cl::Kernel _fhPoolKernel;
-        cl::Kernel _fhPredErrorKernel;
-        //!@}
-
     public:
         /*!
         \brief Initialize defaults
@@ -123,20 +105,26 @@ namespace ogmaneo {
 
         /*!
         \brief Create a sparse feature hierarchy with random initialization
-        Requires the compute system, program with the NeoRL kernels, and initialization information.
         */
         void createRandom(ComputeSystem &cs, ComputeProgram &fhProgram,
             const std::vector<LayerDesc> &layerDescs,
             std::mt19937 &rng);
 
         /*!
-        \brief Simulation step of hierarchy
-        Runs one timestep of simulation.
+        \brief Activation of the hierarchy
+        Runs one timestep of activation (no learning).
         \param inputs the inputs to the bottom-most layer.
         \param rng a random number generator.
-        \param learn optionally disable learning
         */
-        void simStep(ComputeSystem &cs, const std::vector<cl::Image2D> &inputs, const std::vector<cl::Image2D> &predictionsPrev, std::mt19937 &rng, bool learn = true);
+        void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &inputs, std::mt19937 &rng);
+
+        /*!
+        \brief Learn step of hierarchy
+        Runs one timestep of learning. Typically called after a call to activate(...).
+        \param inputs the inputs to the bottom-most layer.
+        \param rng a random number generator.
+        */
+        void learn(ComputeSystem &cs, std::mt19937 &rng);
 
         /*!
         \brief Get number of layers
@@ -147,7 +135,7 @@ namespace ogmaneo {
 
         /*!
         \brief Get access to a layer
-        \param[in] index Layer index.
+        \param index index Layer index.
         */
         const Layer &getLayer(int index) const {
             return _layers[index];
@@ -155,7 +143,7 @@ namespace ogmaneo {
 
         /*!
         \brief Get access to a layer desc
-        \param[in] index Layer index.
+        \param index index Layer index.
         */
         const LayerDesc &getLayerDesc(int index) const {
             return _layerDescs[index];

@@ -11,10 +11,16 @@ include "SparseFeatures.fbs";
 
 namespace ogmaneo.schemas;
 
+enum PredictorLayerType : byte {
+    _none, _inhibitBinary, _q
+}
+
 struct VisiblePredictorLayerDesc {
 	_size:int2;
 	_radius:int;
 	_alpha:float;
+	_lambda:float;
+	_gamma:float;
 }
 
 table VisiblePredictorLayer {
@@ -26,11 +32,10 @@ table VisiblePredictorLayer {
 }
 
 table PredictorLayer {
+	_type:PredictorLayerType;
 	_hiddenSize:int2;
 	_hiddenSummationTemp:DoubleBuffer2D;
 	_hiddenStates:DoubleBuffer2D;
-    _hiddenActivations:DoubleBuffer2D;
-    _inhibitSparseFeatures:SparseFeatures;
 	_visibleLayerDescs:[VisiblePredictorLayerDesc];
 	_visibleLayers:[VisiblePredictorLayer];
 }

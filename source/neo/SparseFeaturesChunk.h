@@ -15,7 +15,7 @@
 namespace ogmaneo {
     /*!
     \brief Chunk encoder (sparse features)
-    Learns a sparse code that is then used to predict the next input. Can be used with multiple layers
+    Learns a sparse code that is then used to predict the next input. Can be used with multiple layers.
     */
     class OGMA_API SparseFeaturesChunk : public SparseFeatures {
     public:
@@ -27,6 +27,11 @@ namespace ogmaneo {
             \brief Size of layer
             */
             cl_int2 _size;
+
+            /*!
+            \brief Number of samples
+            */
+            cl_int _numSamples;
 
             /*!
             \brief Radius onto input
@@ -52,8 +57,8 @@ namespace ogmaneo {
             \brief Initialize defaults
             */
             VisibleLayerDesc()
-                : _size({ 8, 8 }), _radius(8), _ignoreMiddle(false),
-                _weightAlpha(0.04f), _lambda(0.97f)
+                : _size({ 36, 36 }), _numSamples(4), _radius(8), _ignoreMiddle(false),
+                _weightAlpha(0.5f), _lambda(0.8f)
             {}
 
             //!@{
@@ -70,14 +75,24 @@ namespace ogmaneo {
         */
         struct VisibleLayer {
             /*!
-            \brief Possibly manipulated input
+            \brief Derived inputs
             */
-            DoubleBuffer2D _derivedInput;
+            DoubleBuffer2D _derivedInputs;
 
             /*!
             \brief Samples (time sliced derived inputs)
             */
             DoubleBuffer3D _samples;
+
+            /*!
+            \brief Sample accumulation buffer
+            */
+            DoubleBuffer3D _samplesAccum;
+
+            /*!
+            \brief 2D buffer for retrieve a slice of samples
+            */
+            cl::Image2D _samplesSlice;
 
             /*!
             \brief Weights
@@ -119,7 +134,7 @@ namespace ogmaneo {
             std::vector<VisibleLayerDesc> _visibleLayerDescs;
             cl_int2 _hiddenSize;
             cl_int2 _chunkSize;
-            int _numSamples;
+            float _gamma;
             cl_float2 _initWeightRange;
             std::mt19937 _rng;
             //!@}
@@ -130,8 +145,8 @@ namespace ogmaneo {
             SparseFeaturesChunkDesc()
                 : _hiddenSize({ 36, 36 }),
                 _chunkSize({ 6, 6 }),
-                _numSamples(2),
-                _initWeightRange({ -0.01f, 0.01f }),
+                _gamma(0.0001f),
+                _initWeightRange({ 0.999f, 1.0f }),
                 _rng()
             {
                 _name = "chunk";
@@ -153,7 +168,7 @@ namespace ogmaneo {
             \brief Factory
             */
             std::shared_ptr<SparseFeatures> sparseFeaturesFactory() override {
-                return std::make_shared<SparseFeaturesChunk>(*_cs, *_sfcProgram, _visibleLayerDescs, _hiddenSize, _chunkSize, _numSamples, _initWeightRange, _rng);
+                return std::make_shared<SparseFeaturesChunk>(*_cs, *_sfcProgram, _visibleLayerDescs, _hiddenSize, _chunkSize, _gamma, _initWeightRange, _rng);
             }
 
             //!@{
@@ -209,6 +224,8 @@ namespace ogmaneo {
         cl::Kernel _inhibitOtherKernel;
         cl::Kernel _learnWeightsKernel;
         cl::Kernel _deriveInputsKernel;
+        cl::Kernel _sumKernel;
+        cl::Kernel _sliceKernel;
         //!@}
 
     public:
@@ -216,7 +233,7 @@ namespace ogmaneo {
         /*!
         \brief Additional parameters
         */
-        int _numSamples;
+        float _gamma;
         //!@}
 
         /*!
@@ -226,26 +243,42 @@ namespace ogmaneo {
 
         /*!
         \brief Create a comparison sparse coder with random initialization
-        Requires the compute system, program with the NeoRL kernels, and initialization information.
+        \param sfcProgram program containing the chunk encoder kernels.
         \param visibleLayerDescs descriptors for each input layer.
         \param hiddenSize hidden layer (SDR) size (2D).
+        \param chunkSize chunk layer (SDR) size (2D).
+        \param gamma small boosting factor.
+        \param initWeightRange range to initialize weights into - should be (1.0, 1.0] for most purposes.
         \param rng a random number generator.
         */
         SparseFeaturesChunk(ComputeSystem &cs, ComputeProgram &sfcProgram,
             const std::vector<VisibleLayerDesc> &visibleLayerDescs,
             cl_int2 hiddenSize,
             cl_int2 chunkSize,
-            int numSamples,
+            float gamma,
             cl_float2 initWeightRange,
             std::mt19937 &rng);
 
         /*!
+        \brief Add a new sample
+        */
+        void subSample(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, std::mt19937 &rng) override;
+
+        /*!
+        \brief Retrieve sample
+        */
+        cl::Image2D &getSubSample(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) override;
+
+        /*!
+        \brief Retrieve sample
+        */
+        cl::Image2D &getSubSampleAccum(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) override;
+
+        /*!
         \brief Activate predictor
-        \param lambda decay of hidden unit traces.
-        \param activeRatio % active units.
         \param rng a random number generator.
         */
-        void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, const cl::Image2D &predictionsPrev, std::mt19937 &rng) override;
+        void activate(ComputeSystem &cs, std::mt19937 &rng) override;
 
         /*!
         \brief End a simulation step
@@ -254,17 +287,14 @@ namespace ogmaneo {
 
         /*!
         \brief Learning
-        \param biasAlpha learning rate of bias.
-        \param activeRatio % active units.
-        \param gamma synaptic trace decay.
         */
-        void learn(ComputeSystem &cs, const cl::Image2D &predictionsPrev, std::mt19937 &rng) override;
+        void learn(ComputeSystem &cs, std::mt19937 &rng) override;
 
         /*!
-        \brief Inhibit
+        \brief Inhibit another set of activations
         Inhibits given activations using this encoder's inhibitory pattern
         */
-        void inhibit(ComputeSystem &cs, const cl::Image2D &activations, cl::Image2D &states, std::mt19937 &rng) override;
+        void inhibit(ComputeSystem &cs, const cl::Image2D &activations, cl::Image2D &states, std::mt19937 &rng);
 
         /*!
         \brief Get number of visible layers
@@ -292,6 +322,13 @@ namespace ogmaneo {
         */
         cl_int2 getHiddenSize() const override {
             return _hiddenSize;
+        }
+
+        /*!
+        \brief Get hidden size
+        */
+        cl_int2 getChunkSize() const override {
+            return _chunkSize;
         }
 
         /*!

@@ -10,14 +10,14 @@
 
 #include "system/SharedLib.h"
 #include "SparseFeatures.h"
-#include "schemas/SparseFeaturesReLU_generated.h"
+#include "schemas/SparseFeaturesDistance_generated.h"
 
 namespace ogmaneo {
     /*!
-    \brief ReLU encoder (sparse features)
+    \brief Distance encoder (sparse features)
     Learns a sparse code that is then used to predict the next input. Can be used with multiple layers
     */
-    class OGMA_API SparseFeaturesReLU : public SparseFeatures {
+    class OGMA_API SparseFeaturesDistance : public SparseFeatures {
     public:
         /*!
         \brief Visible layer desc
@@ -29,27 +29,24 @@ namespace ogmaneo {
             cl_int2 _size;
 
             /*!
-            \brief Radius onto input
+            \brief Number of samples
             */
-            cl_int _radiusHidden;
+            cl_int _numSamples;
 
             /*!
-            \brief Radius onto hidden
+            \brief Radius onto input
             */
-            cl_int _radiusVisible;
+            cl_int _radius;
 
             /*!
             \brief Whether or not the middle (center) input should be ignored (self in recurrent schemes)
             */
             unsigned char _ignoreMiddle;
 
-            //!@{
             /*!
-            \brief Learning rates
+            \brief Learning rate
             */
-            cl_float _weightAlphaHidden;
-            cl_float _weightAlphaVisible;
-            //!@}
+            cl_float _weightAlpha;
 
             /*!
             \brief Short trace rate
@@ -57,24 +54,19 @@ namespace ogmaneo {
             float _lambda;
 
             /*!
-            \brief Whether this layer should be predicted
-            */
-            bool _predict;
-
-            /*!
             \brief Initialize defaults
             */
             VisibleLayerDesc()
-                : _size({ 8, 8 }), _radiusHidden(8), _radiusVisible(8), _ignoreMiddle(false),
-                _weightAlphaHidden(0.005f), _weightAlphaVisible(0.05f), _lambda(0.8f), _predict(true)
+                : _size({ 36, 36 }), _numSamples(3), _radius(8), _ignoreMiddle(false),
+                _weightAlpha(1.0f), _lambda(0.8f)
             {}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::VisibleReLULayerDesc* fbVisibleReLULayer, ComputeSystem &cs);
-            schemas::VisibleReLULayerDesc save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::VisibleDistanceLayerDesc* fbVisibleDistanceLayer, ComputeSystem &cs);
+            schemas::VisibleDistanceLayerDesc save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
@@ -83,27 +75,29 @@ namespace ogmaneo {
         */
         struct VisibleLayer {
             /*!
-            \brief Possibly manipulated input
+            \brief Derived inputs
             */
-            DoubleBuffer2D _derivedInput;
-
-            /*!
-            \brief Predictions
-            */
-            DoubleBuffer2D _predictions;
+            DoubleBuffer2D _derivedInputs;
 
             /*!
             \brief Samples (time sliced derived inputs)
             */
             DoubleBuffer3D _samples;
 
-            //!@{
+            /*!
+            \brief Sample accumulation buffer
+            */
+            DoubleBuffer3D _samplesAccum;
+
+            /*!
+            \brief 2D buffer for retrieve a slice of samples
+            */
+            cl::Image2D _samplesSlice;
+
             /*!
             \brief Weights
             */
-            DoubleBuffer3D _weightsHidden;
-            DoubleBuffer3D _weightsVisible;
-            //!@}
+            DoubleBuffer3D _weights;
 
             //!@{
             /*!
@@ -112,37 +106,35 @@ namespace ogmaneo {
             cl_float2 _hiddenToVisible;
             cl_float2 _visibleToHidden;
 
-            cl_int2 _reverseRadiiHidden;
-            cl_int2 _reverseRadiiVisible;
+            cl_float2 _chunkToVisible;
+
+            cl_int2 _reverseRadii;
             //!@}
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::VisibleReLULayer* fbVisibleReLULayer, ComputeSystem &cs);
-            flatbuffers::Offset<schemas::VisibleReLULayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::VisibleDistanceLayer* fbVisibleDistanceLayer, ComputeSystem &cs);
+            flatbuffers::Offset<schemas::VisibleDistanceLayer> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
         /*!
-        \brief Sparse Features ReLU Descriptor
+        \brief Sparse Features Distance Descriptor
         */
-        class OGMA_API SparseFeaturesReLUDesc : public SparseFeatures::SparseFeaturesDesc {
+        class OGMA_API SparseFeaturesDistanceDesc : public SparseFeatures::SparseFeaturesDesc {
         public:
             //!@{
             /*!
             \brief Construction information
             */
             std::shared_ptr<ComputeSystem> _cs;
-            std::shared_ptr<ComputeProgram> _sfrProgram;
+            std::shared_ptr<ComputeProgram> _sfdProgram;
             std::vector<VisibleLayerDesc> _visibleLayerDescs;
             cl_int2 _hiddenSize;
-            int _numSamples;
-            cl_int _lateralRadius;
-            cl_float _gamma;
-            cl_float _activeRatio;
-            cl_float _biasAlpha;
+            cl_int2 _chunkSize;
+            float _gamma;
             cl_float2 _initWeightRange;
             std::mt19937 _rng;
             //!@}
@@ -150,14 +142,14 @@ namespace ogmaneo {
             /*!
             \brief Defaults
             */
-            SparseFeaturesReLUDesc()
-                : _hiddenSize({ 16, 16 }),
-                _numSamples(1), _lateralRadius(6),
-                _gamma(0.92f), _activeRatio(0.02f), _biasAlpha(0.005f),
-                _initWeightRange({ -0.01f, 0.01f }),
+            SparseFeaturesDistanceDesc()
+                : _hiddenSize({ 36, 36 }),
+                _chunkSize({ 6, 6 }),
+                _gamma(0.9999f),
+                _initWeightRange({ 0.0f, 0.01f }),
                 _rng()
             {
-                _name = "ReLU";
+                _name = "distance";
             }
 
             size_t getNumVisibleLayers() const override {
@@ -176,31 +168,37 @@ namespace ogmaneo {
             \brief Factory
             */
             std::shared_ptr<SparseFeatures> sparseFeaturesFactory() override {
-                return std::make_shared<SparseFeaturesReLU>(*_cs, *_sfrProgram, _visibleLayerDescs, _hiddenSize, _numSamples, _lateralRadius, _gamma, _activeRatio, _biasAlpha, _initWeightRange, _rng);
+                return std::make_shared<SparseFeaturesDistance>(*_cs, *_sfdProgram, _visibleLayerDescs, _hiddenSize, _chunkSize, _gamma, _initWeightRange, _rng);
             }
 
             //!@{
             /*!
             \brief Serialization
             */
-            void load(const schemas::SparseFeaturesReLUDesc* fbSparseFeaturesReLUDesc, ComputeSystem &cs);
-            flatbuffers::Offset<schemas::SparseFeaturesReLUDesc> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
+            void load(const schemas::SparseFeaturesDistanceDesc* fbSparseFeaturesDistanceDesc, ComputeSystem &cs);
+            flatbuffers::Offset<schemas::SparseFeaturesDistanceDesc> save(flatbuffers::FlatBufferBuilder &builder, ComputeSystem &cs);
             //!@}
         };
 
     private:
         //!@{
         /*!
-        \brief Hidden states, biases
+        \brief Hidden states, activations, chunk winners
         */
         DoubleBuffer2D _hiddenStates;
-        DoubleBuffer2D _hiddenBiases;
+        DoubleBuffer2D _hiddenActivations;
+        DoubleBuffer2D _chunkWinners;
         //!@}
 
         /*!
         \brief Hidden size
         */
         cl_int2 _hiddenSize;
+
+        /*!
+        \brief Size of chunks
+        */
+        cl_int2 _chunkSize;
 
         /*!
         \brief Hidden summation temporary buffer
@@ -221,14 +219,13 @@ namespace ogmaneo {
         */
         cl::Kernel _addSampleKernel;
         cl::Kernel _stimulusKernel;
+        cl::Kernel _activateKernel;
         cl::Kernel _inhibitKernel;
-        cl::Kernel _predictKernel;
         cl::Kernel _inhibitOtherKernel;
-        cl::Kernel _errorPropKernel;
-        cl::Kernel _learnWeightsHiddenKernel;
-        cl::Kernel _learnWeightsVisibleKernel;
-        cl::Kernel _learnBiasesKernel;
+        cl::Kernel _learnWeightsKernel;
         cl::Kernel _deriveInputsKernel;
+        cl::Kernel _sumKernel;
+        cl::Kernel _sliceKernel;
         //!@}
 
     public:
@@ -236,39 +233,51 @@ namespace ogmaneo {
         /*!
         \brief Additional parameters
         */
-        int _numSamples;
-        int _lateralRadius;
         float _gamma;
-        float _activeRatio;
-        float _biasAlpha;
         //!@}
 
         /*!
         \brief Default constructor
         */
-        SparseFeaturesReLU() {};
+        SparseFeaturesDistance() {};
 
         /*!
         \brief Create a comparison sparse coder with random initialization
-        Requires the compute system, program with the NeoRL kernels, and initialization information.
+        \param sfdProgram program containing the distance encoder kernels.
         \param visibleLayerDescs descriptors for each input layer.
         \param hiddenSize hidden layer (SDR) size (2D).
+        \param chunkSize chunk layer (SDR) size (2D).
+        \param gamma decay of inverse learning rates (should be in the (1.0, 1.0] range for most purposes).
+        \param initWeightRange range to initialize the weights into.
         \param rng a random number generator.
         */
-        SparseFeaturesReLU(ComputeSystem &cs, ComputeProgram &sfrProgram,
-            const std::vector<VisibleLayerDesc> &visibleLayerDescs, cl_int2 hiddenSize,
-            int numSamples, int lateralRadius,
-            cl_float gamma, cl_float activeRatio, cl_float biasAlpha,
+        SparseFeaturesDistance(ComputeSystem &cs, ComputeProgram &sfdProgram,
+            const std::vector<VisibleLayerDesc> &visibleLayerDescs,
+            cl_int2 hiddenSize,
+            cl_int2 chunkSize,
+            float gamma,
             cl_float2 initWeightRange,
             std::mt19937 &rng);
 
         /*!
-        \brief Activate predictor
-        \param lambda decay of hidden unit traces.
-        \param activeRatio % active units.
-        \param rng a random number generator.
+        \brief Add a new sample
         */
-        void activate(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, const cl::Image2D &predictionsPrev, std::mt19937 &rng) override;
+        void subSample(ComputeSystem &cs, const std::vector<cl::Image2D> &visibleStates, std::mt19937 &rng) override;
+
+        /*!
+        \brief Retrieve sample
+        */
+        cl::Image2D &getSubSample(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) override;
+
+        /*!
+        \brief Retrieve sample
+        */
+        cl::Image2D &getSubSampleAccum(ComputeSystem &cs, int vli, int index, std::mt19937 &rng) override;
+
+        /*!
+        \brief Activate predictor
+        */
+        void activate(ComputeSystem &cs, std::mt19937 &rng) override;
 
         /*!
         \brief End a simulation step
@@ -277,17 +286,14 @@ namespace ogmaneo {
 
         /*!
         \brief Learning
-        \param biasAlpha learning rate of bias.
-        \param activeRatio % active units.
-        \param gamma synaptic trace decay.
         */
-        void learn(ComputeSystem &cs, const cl::Image2D &predictionsPrev, std::mt19937 &rng) override;
+        void learn(ComputeSystem &cs, std::mt19937 &rng) override;
 
         /*!
-        \brief Inhibit
+        \brief Inhibit activations
         Inhibits given activations using this encoder's inhibitory pattern
         */
-        void inhibit(ComputeSystem &cs, const cl::Image2D &activations, cl::Image2D &states, std::mt19937 &rng) override;
+        void inhibit(ComputeSystem &cs, const cl::Image2D &activations, cl::Image2D &states, std::mt19937 &rng);
 
         /*!
         \brief Get number of visible layers
@@ -318,6 +324,13 @@ namespace ogmaneo {
         }
 
         /*!
+        \brief Get hidden size
+        */
+        cl_int2 getChunkSize() const override {
+            return _chunkSize;
+        }
+
+        /*!
         \brief Get hidden states
         */
         const DoubleBuffer2D &getHiddenStates() const override {
@@ -332,10 +345,17 @@ namespace ogmaneo {
         }
 
         /*!
-        \brief Get hidden biases
+        \brief Get hidden activations
         */
-        const DoubleBuffer2D &getHiddenBiases() const {
-            return _hiddenBiases;
+        const DoubleBuffer2D &getHiddenActivations() const {
+            return _hiddenActivations;
+        }
+
+        /*!
+        \brief Get hidden chunk winner
+        */
+        const DoubleBuffer2D &getDistanceWinners() const {
+            return _chunkWinners;
         }
 
         /*!
