@@ -1,6 +1,6 @@
 <!---
   OgmaNeo
-  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+  Copyright(c) 2016-2017 Ogma Intelligent Systems Corp. All rights reserved.
 
   This copy of OgmaNeo is licensed to you under the terms described
   in the OGMANEO_LICENSE.md file included in this distribution.
@@ -16,14 +16,11 @@ Welcome to [Ogma](https://ogmacorp.com) OgmaNeo library. A C++ library that cont
 
 The current release of this library contains a form of Sparse Predictive Hierarchies. Refer to the arXiv.org paper for further details.
 
-Three other OgmaCorp GitHub repositories contain:
-- Examples using this library ([OgmaNeoDemos](https://github.com/ogmacorp/OgmaNeoDemos))
-- Python bindings to this library ([PyOgmaNeo](https://github.com/ogmacorp/PyOgmaNeo))
-- Java (JNI) bindings to this library ([JOgmaNeo](https://github.com/ogmacorp/JOgmaNeo))
+Examples using this library can be found in the [OgmaNeoDemos](https://github.com/ogmacorp/OgmaNeoDemos) GitHub repository, and alongside the language bindings within this repository.
+
+SWIG based language bindings for Python, Java (JNI), and C# are found in subdirectories. Refer to Readme.md files in those subdirectories for further information.
 
 ## Overview
-
-Refer to the [OgmaNeoDemos](https://github.com/ogmacorp/OgmaNeoDemos) repository for more complicated usage.
 
 OgmaNeo is a fully online learning algorithm, so data must be passed in an appropriately streamed fashion.
 
@@ -140,17 +137,24 @@ Sparse features Distance (prefix 'sfd'):
 
 ## Requirements
 
-OgmaNeo requires: a C++1x compiler, [CMake](https://cmake.org/), the [FlatBuffers](https://google.github.io/flatbuffers/) package (version 1.4.0), an OpenCL 1.2 SDK, and the Khronos Group cl2.hpp file.
+OgmaNeo requires:
+- C++1x compiler,
+- [CMake](https://cmake.org/),
+- [FlatBuffers](https://google.github.io/flatbuffers/) package (version 1.4.0),
+- an OpenCL 1.2 SDK, and
+- Khronos Group cl2.hpp file.
+
+These requirements **must** be installed and setup before building the OgmaNeo library.
 
 The library has been tested extensively on:
  - Windows using Microsoft Visual Studio 2013 and 2015,
  - Linux using GCC 4.8 and upwards,
- - Mac OSX using Clang, and
+ - Mac OSX using XCode/Clang, and
  - Raspberry Pi3, using Raspbian Jessie with GCC 4.8
 
 ### CMake
 
-Version 3.1, and upwards, of [CMake](https://cmake.org/) is the required version to use when building the library.
+Version 3.1+ of [CMake](https://cmake.org/) is required when building the library.
 
 The [CMakeLists.txt](https://github.com/ogmacorp/OgmaNeo/blob/master/CMakeLists.txt) file uses an ExternalProject to download and build the FlatBuffers package. It also defines custom build targets to automatically package kernel code into the library. Kernel packaging is required for [OgmaNeoDemos](https://github.com/ogmacorp/OgmaNeoDemos), and the Python bindings [PyOgmaNeo](https://github.com/ogmacorp/PyOgmaNeo).
 
@@ -158,13 +162,11 @@ The [CMakeLists.txt](https://github.com/ogmacorp/OgmaNeo/blob/master/CMakeLists.
 
 [OpenCL](https://www.khronos.org/opencl/) (Open Compute Language, version 1.2 and upwards) is used to compile, upload and run kernel code on CPU and GPU devices. An OpenCL SDK, with system drivers that support OpenCL 1.2, is required to build and use the OgmaNeo library.
 
-The open source POCL package ([Portable Computing Language](http://portablecl.org/)) can be used for devices that don't have OpenCL vendor driver support. For example the OgmaNeo library using POCL ([release branch 0.13](https://github.com/pocl/pocl/tree/release_0_13)) has been tested on the Raspberry Pi3 device and Travis-CI service.
+The open source POCL package ([Portable Computing Language](http://portablecl.org/)) can be used for devices that don't have OpenCL vendor driver support. For example the OgmaNeo library using POCL ([release branch 0.13](https://github.com/pocl/pocl/tree/release_0_13)) has been tested on the Raspberry Pi3 device and the Travis continuous integration service.
 
 ### CL2 header file
 
-The Khronos Group [cl2.hpp](http://github.khronos.org/OpenCL-CLHPP/) header file is required when building OgmaNeo. And needs to be placed alongside your OpenCL header files. It can be downloaded from Github https://github.com/KhronosGroup/OpenCL-CLHPP/releases
-
-If the `cl2.hpp` file cannot be found the `CMakeLists.txt` script will download the file and include it within library build process. On all other supported platforms the file requires a manual download and copy to the appropriate location (e.g. directory `/usr/include/CL`).
+The Khronos Group's [cl2.hpp](http://github.khronos.org/OpenCL-CLHPP/) header file is required when building OgmaNeo. It needs to be placed alongside your OpenCL header files. The header file can be downloaded from Github [https://github.com/KhronosGroup/OpenCL-CLHPP/releases](https://github.com/KhronosGroup/OpenCL-CLHPP/releases)
 
 ### Flatbuffers
 
@@ -178,16 +180,31 @@ If you do not already have the Flatbuffers package installed, the OgmaNeo CMakeL
 
 The following commands can be used to build the OgmaNeo library:
 
-> mkdir build; cd build  
-> cmake -DBUILD_SHARED_LIBS=ON ..  
+> git clone https://github.com/ogmacorp/ogmaneo.git  
+> cd ogmaneo  
+> mkdir build  
+> cd build  
+> cmake -DCMAKE_INSTALL_PREFIX=../install ..  
 > make  
+> make install
 
 The `cmake` command can be passed a `CMAKE_INSTALL_PREFIX` to determine where to install the library and header files.  
-The `BUILD_SHARED_LIBS` boolean cmake option can be used to create dynamic/shared object library (default is to create a _static_ library).
+
+The `BUILD_SHARED_LIBS` boolean cmake option can be used to create dynamic/shared object library (default is to create a _static_ library). On Linux it's recommended to add `-DBUILD_SHARED_LIBS=ON`
 
 `make install` can be run to install the library. `make uninstall` can be used to uninstall the library.
 
-On Windows it is recommended to use `cmake-gui` to define which generator to use and specify optional build parameters.
+On **Windows** systems it is recommended to use `cmake-gui` to define which generator to use and specify optional build parameters, such as `CMAKE_INSTALL_PREFIX`.
+
+## Language bindings
+
+The following language bindings exist for the OgmaNeo library:
+
+- Python (2 and 3)
+- Java (JNI)
+- C#
+
+They each exist in a subdirectory, and a Readme.md file in each subdirectory provides information on how to build these SWIG based bindings.
 
 ## Contributions
 
@@ -201,4 +218,4 @@ Contact Ogma via licenses@ogmacorp.com to discuss commercial use and licensing o
 
 The OgmaNeo library uses the Google [FlatBuffers](http://google.github.io/flatbuffers/) package that is licensed with an Apache License (Version 2.0). Refer to this [LICENSE.txt](https://github.com/google/flatbuffers/blob/master/LICENSE.txt) file for the full licensing text associated with the FlatBuffers package.
 
-OgmaNeo Copyright (c) 2016 [Ogma Intelligent Systems Corp](https://ogmacorp.com). All rights reserved.
+OgmaNeo Copyright (c) 2016-2017 [Ogma Intelligent Systems Corp](https://ogmacorp.com). All rights reserved.

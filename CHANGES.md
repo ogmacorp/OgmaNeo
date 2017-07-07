@@ -1,3 +1,9 @@
+1.4 July, 2017
+==============
+
+- Merged Python and Java(JNI) bindings
+- Add C# language bindings
+
 1.3 March, 2017
 ===============
 

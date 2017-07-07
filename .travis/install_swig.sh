@@ -9,19 +9,13 @@
 set -ex
 
 #----------------------------------------
-# Package updates
+# Install the latest SWIG
+cd $TRAVIS_BUILD_DIR
 
-if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
-    #brew unlink cmake
-    brew update
-
-    brew tap homebrew/versions
-    brew install gcc@4.8
-
+if [ $TRAVIS_OS_NAME == 'osx' ]; then
+    brew upgrade pcre
+    brew install swig
 else
-    sudo apt-get -qq update
-
-    # Trusty has:
-    # gcc 4.8.4
-    # llvm clang 3.5.0
+    sudo apt install libpcre3 libpcre3-dev
+    sudo apt install swig3.0
 fi
