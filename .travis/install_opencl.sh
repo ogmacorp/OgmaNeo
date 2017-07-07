@@ -16,11 +16,10 @@ if [ $TRAVIS_OS_NAME == 'linux' ]; then
 
     sudo apt install libhwloc-dev ocl-icd-opencl-dev libglew-dev
     sudo apt install zlib1g-dev libedit-dev libltdl-dev opencl-headers
+    sudo apt install clang-3.8 libclang-3.8-dev
 
     # Check to see if POCL cache folder is empty
     if [ ! -d "$HOME/.local/pocl" ]; then
-        sudo apt install clang-3.8 libclang-3.8-dev
-
         git clone https://github.com/pocl/pocl.git
         cd pocl
 

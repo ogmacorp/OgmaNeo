@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------------
 #  OgmaNeo
-#  Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+#  Copyright(c) 2016-2017 Ogma Intelligent Systems Corp. All rights reserved.
 #
 #  This copy of OgmaNeo is licensed to you under the terms described
 #  in the OGMANEO_LICENSE.md file included in this distribution.
@@ -12,6 +12,12 @@ cmake_minimum_required(VERSION 3.1)
 project(OgmaNeo)
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 
+set(OGMANEO_MAJOR_VERSION 1)
+set(OGMANEO_MINOR_VERSION 4)
+set(OGMANEO_PATCH_VERSION 0)
+set(OGMANEO_VERSION
+  ${OGMANEO_MAJOR_VERSION}.${OGMANEO_MINOR_VERSION}.${OGMANEO_PATCH_VERSION})
+ 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -136,7 +142,7 @@ if ("${CL2_HPP_NAME}" STREQUAL "CL2_HPP_NAME-NOTFOUND")
 else()
     # Extract the directory
     get_filename_component(CL2_HPP_DIR "${CL2_HPP_NAME}" DIRECTORY)
-    message(STATUS "CL2.HPP found in ${CL2_HPP_DIR}")
+    message(STATUS "Found existing CL2.hpp in ${CL2_HPP_DIR}")
 
     include_directories(SYSTEM "${CL2_HPP_DIR}/..")
 endif()
@@ -222,7 +228,7 @@ foreach(ocl_filename ${KERNEL_SRC})
 
     add_custom_command(
         OUTPUT "${outfile}"
-	COMMAND OgmaOCLtoHpp "${infileCommon}" "${infile}" "${outfile}" ${filename}
+	    COMMAND OgmaOCLtoHpp "${infileCommon}" "${infile}" "${outfile}" ${filename}
         DEPENDS "${infileCommon}" "${infile}" OgmaOCLtoHpp
         VERBATIM)
 
@@ -278,21 +284,76 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
     endif()
 endif()
 
+# Offer the user the choice of overriding the installation directories
+set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
+set(INSTALL_INCLUDE_DIR include/ogmaneo CACHE PATH
+  "Installation directory for header files")
+
+message(STATUS "CMake install prefix = ${CMAKE_INSTALL_PREFIX}")
+
+if(WIN32 AND NOT CYGWIN)
+  set(DEF_INSTALL_CMAKE_DIR CMake)
+else()
+  set(DEF_INSTALL_CMAKE_DIR lib/CMake/OgmaNeo)
+endif()
+set(INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH
+  "Installation directory for CMake files")
+ 
+# Make relative paths absolute (needed later on)
+foreach(p LIB BIN INCLUDE CMAKE)
+  set(var INSTALL_${p}_DIR)
+  if(NOT IS_ABSOLUTE "${${var}}")
+    set(${var} "${CMAKE_INSTALL_PREFIX}/${${var}}")
+  endif()
+endforeach()
+ 
+# Add all targets to the build-tree export set
+export(TARGETS OgmaNeo
+  FILE "${PROJECT_BINARY_DIR}/OgmaNeoTargets.cmake")
+ 
+# Export the package for use from the build-tree
+# (this registers the build-tree with a global CMake-registry)
+export(PACKAGE OgmaNeo)
+ 
+file(RELATIVE_PATH REL_INCLUDE_DIR "${INSTALL_CMAKE_DIR}"
+   "${INSTALL_INCLUDE_DIR}")
+
+set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
+configure_file(OgmaNeoConfig.cmake.in
+  "${PROJECT_BINARY_DIR}/OgmaNeoConfig.cmake" @ONLY)
+
+set(CONF_INCLUDE_DIRS "\${OGMANEO_CMAKE_DIR}/${REL_INCLUDE_DIR}")
+configure_file(OgmaNeoConfig.cmake.in
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/OgmaNeoConfig.cmake" @ONLY)
+
+configure_file(OgmaNeoConfigVersion.cmake.in
+  "${PROJECT_BINARY_DIR}/OgmaNeoConfigVersion.cmake" @ONLY)
+ 
+install(FILES
+  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/OgmaNeoConfig.cmake"
+  "${PROJECT_BINARY_DIR}/OgmaNeoConfigVersion.cmake"
+  DESTINATION "${INSTALL_CMAKE_DIR}")
+  
 # Library install target
 install(TARGETS OgmaNeo
+        EXPORT OgmaNeoTargets
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
 
 # Headers, incl. schema headers, install targets
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/source/"
+        EXPORT OgmaNeoTargets
         DESTINATION include/ogmaneo
         FILES_MATCHING PATTERN "*.h*")
 
 # 3rd party headers install targets
 install(DIRECTORY "${3RDPARTY_PATH}/include/"
+        EXPORT OgmaNeoTargets
         DESTINATION include/ogmaneo
         FILES_MATCHING PATTERN "*.h*")
+ 
+install(EXPORT OgmaNeoTargets DESTINATION "${INSTALL_CMAKE_DIR}")
 
 # Uninstall target
 configure_file(
@@ -302,3 +363,4 @@ configure_file(
 
 add_custom_target(uninstall
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+

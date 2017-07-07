@@ -1,35 +1,33 @@
 # OgmaNeo
-# Copyright(c) 2016 Ogma Intelligent Systems Corp. All rights reserved.
+# Copyright(c) 2016-2017 Ogma Intelligent Systems Corp. All rights reserved.
 #
 # This copy of OgmaNeo is licensed to you under the terms described
 # in the OGMANEO_LICENSE.md file included in this distribution.
 
 language: cpp
 
-sudo: required
 dist: trusty
+sudo: required
 
-os:
-  # https://docs.travis-ci.com/user/trusty-ci-environment/
-  # Ubuntu 14.04 Trusty Tahr
-  - linux
+matrix:
+  include:
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            # C++11 compiler for Linux builds
+            - g++-4.8
 
-  # https://docs.travis-ci.com/user/osx-ci-environment/
-  # OS X 10.11.6 (and Xcode 7.3.1)
-  - osx
-
-addons:
-  apt:
-    sources:
-      - ubuntu-toolchain-r-test
-    packages:
-      # C++11 compiler for Linux builds
-      - gcc-4.8
-      - g++-4.8
+    # https://docs.travis-ci.com/user/osx-ci-environment/
+    - os: osx
+      osx_image: xcode8
 
 cache:
   directories:
     - $HOME/.local
+    - $HOME/.cache/pip
 
 before_install:
   # Install dependencies into $HOME/.local
@@ -42,25 +40,55 @@ install:
   # Install OpenCL (Linux - POCL driver, release_0_13)
   - bash ./.travis/install_opencl.sh
 
+  # Install SWIG into $HOME/.local
+  - bash ./.travis/install_swig.sh
+
+  # Install dependancies for python
+  - pip install -r ./Python/requirements.txt
+
 script:
+  - if [ $TRAVIS_OS_NAME == 'linux' ]; then
+      export CC=gcc-4.8;
+      export CXX=g++-4.8;
+    fi
+
   - echo Travis OS Name ... ${TRAVIS_OS_NAME}
   - echo Travis build dir ... ${TRAVIS_BUILD_DIR}
+  - echo PATH var ... ${PATH}
   - echo CMake Version .. $($HOME/.local/cmake/bin/cmake --version)
+  - echo Python Version ... $(python --version)
+  - which python
+  - which pip
 
   # Build the OgmaNeo library
   - cd $TRAVIS_BUILD_DIR
   - mkdir build
   - cd build
 
-  - if [ $TRAVIS_OS_NAME == 'linux' ]; then
-      export CC=gcc-4.8;
-      export CXX=g++-4.8;
-    fi
-
   - $HOME/.local/cmake/bin/cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=../install .. || travis_terminate 1;
 
   - make
   - make install
+
+  # Build the Python bindings
+  - cd ../Python
+  - python setup.py bdist_wheel
+
+  - cd dist/
+  - ls -l
+  - pip install $(ls)
+  - cd ..
+
+  - pip show ogmaneo
+
+  # Build and test the Java JNI bindings
+  - cd ../Java
+  - mkdir build; cd build;
+  - $HOME/.local/cmake/bin/cmake ..
+  - make
+
+  - javac -cp JOgmaNeo.jar ../src/com/ogmacorp/Example.java -d .
+  - java -cp JOgmaNeo.jar:. -Djava.library.path=. Example 0
 
 notifications:
   email:

@@ -1,0 +1,24 @@
+# ----------------------------------------------------------------------------
+#  OgmaNeo
+#  Copyright(c) 2016-2017 Ogma Intelligent Systems Corp. All rights reserved.
+#
+#  This copy of OgmaNeo is licensed to you under the terms described
+#  in the OGMANEO_LICENSE.md file included in this distribution.
+# ----------------------------------------------------------------------------
+
+# - Config file for the OgmaNeo package
+# It defines the following variables
+#  OGMANEO_INCLUDE_DIRS - include directories for OgmaNeo
+#  OGMANEO_LIBRARIES    - libraries to link against
+ 
+# Compute paths
+get_filename_component(OGMANEO_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(OGMANEO_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+ 
+# Our library dependencies (contains definitions for IMPORTED targets)
+if(NOT TARGET OgmaNeo AND NOT OgmaNeo_BINARY_DIR)
+  include("${OGMANEO_CMAKE_DIR}/OgmaNeoTargets.cmake")
+endif()
+ 
+# These are IMPORTED targets created by vTargets.cmake
+set(OGMANEO_LIBRARIES OgmaNeo)
