@@ -1,0 +1,19 @@
+# ----------------------------------------------------------------------------
+#  OgmaNeo
+#  Copyright(c) 2016-2017 Ogma Intelligent Systems Corp. All rights reserved.
+#
+#  This copy of OgmaNeo is licensed to you under the terms described
+#  in the OGMANEO_LICENSE.md file included in this distribution.
+# ----------------------------------------------------------------------------
+
+set(PACKAGE_VERSION "@OGMANEO_VERSION@")
+ 
+# Check whether the requested PACKAGE_FIND_VERSION is compatible
+if("${PACKAGE_VERSION}" VERSION_LESS "${PACKAGE_FIND_VERSION}")
+  set(PACKAGE_VERSION_COMPATIBLE FALSE)
+else()
+  set(PACKAGE_VERSION_COMPATIBLE TRUE)
+  if ("${PACKAGE_VERSION}" VERSION_EQUAL "${PACKAGE_FIND_VERSION}")
+    set(PACKAGE_VERSION_EXACT TRUE)
+  endif()
+endif()
