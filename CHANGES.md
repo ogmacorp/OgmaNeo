@@ -1,3 +1,8 @@
+1.4.1 July, 2017
+================
+
+- Correct a few README issues
+
 1.4 July, 2017
 ==============
 
