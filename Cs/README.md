@@ -118,4 +118,4 @@ Refer to the OgmaNeo [CONTRIBUTING.md](https://github.com/ogmacorp/OgmaNeo/blob/
 
 Contact Ogma via licenses@ogmacorp.com to discuss commercial use and licensing options.
 
-OgmanNeo Copyright (c) 2016-2017 [Ogma Intelligent Systems Corp](https://ogmacorp.com). All rights reserved.
+OgmaNeo Copyright (c) 2016-2017 [Ogma Intelligent Systems Corp](https://ogmacorp.com). All rights reserved.
