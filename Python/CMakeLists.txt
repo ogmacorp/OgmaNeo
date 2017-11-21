@@ -44,7 +44,13 @@ link_directories("${OGMANEO_PATH}/lib")
 ############################################################################
 # Find OgmaNeo include and libs
 
-find_package(OgmaNeo CONFIG HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../install//${DEF_INSTALL_CMAKE_DIR}")
+if(WIN32 AND NOT CYGWIN)
+    set(DEF_INSTALL_CMAKE_DIR CMake)
+else()
+    set(DEF_INSTALL_CMAKE_DIR lib/CMake/OgmaNeo)
+endif()
+
+find_package(OgmaNeo CONFIG HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../install/${DEF_INSTALL_CMAKE_DIR}")
 
 if ("${OGMANEO_INCLUDE_DIR}" STREQUAL "OGMANEO_INCLUDE_DIR-NOTFOUND" OR
     "${OGMANEO_INCLUDE_DIR}" STREQUAL "")
@@ -74,7 +80,7 @@ if ("${OGMANEO_INCLUDE_DIR}" STREQUAL "OGMANEO_INCLUDE_DIR-NOTFOUND" OR
     endif()
 else()
     message(STATUS "Found existing OgmaNeo in ${OGMANEO_INCLUDE_DIRS}")
-    #message(STATUS "Found existing OgmaNeo lib ${OGMANEO_LIBRARIES}")
+    message(STATUS "Found existing OgmaNeo lib ${OGMANEO_LIBRARIES}")
 endif()
 
 include_directories(${OGMANEO_INCLUDE_DIRS})
@@ -180,7 +186,7 @@ else()
     get_filename_component(CL2_HPP_DIR "${CL2_HPP_NAME}" DIRECTORY)
     message(STATUS "Found existing CL2.hpp in ${CL2_HPP_DIR}")
 
-    include_directories(SYSTEM "${CL2_HPP_DIR}/..")
+    include_directories("${CL2_HPP_DIR}/..")
 endif()
 
 

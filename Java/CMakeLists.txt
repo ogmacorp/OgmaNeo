@@ -30,10 +30,16 @@ link_directories("${OGMANEO_PATH}/lib")
 ############################################################################
 # Find OgmaNeo include and libs
 
-find_package(OgmaNeo HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../install/")
+if(WIN32 AND NOT CYGWIN)
+    set(DEF_INSTALL_CMAKE_DIR CMake)
+else()
+    set(DEF_INSTALL_CMAKE_DIR lib/CMake/OgmaNeo)
+endif()
 
-if ("${OGMANEO_INCLUDE_DIR}" STREQUAL "OGMANEO_INCLUDE_DIR-NOTFOUND" OR
-    "${OGMANEO_INCLUDE_DIR}" STREQUAL "")
+find_package(OgmaNeo CONFIG HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../install/${DEF_INSTALL_CMAKE_DIR}")
+
+if ("${OGMANEO_INCLUDE_DIRS}" STREQUAL "OGMANEO_INCLUDE_DIRS-NOTFOUND" OR
+    "${OGMANEO_INCLUDE_DIRS}" STREQUAL "")
     message(STATUS "-- OgmaNeo will be downloaded and built from source")
 
     if(WIN32 OR APPLE)
@@ -60,7 +66,7 @@ if ("${OGMANEO_INCLUDE_DIR}" STREQUAL "OGMANEO_INCLUDE_DIR-NOTFOUND" OR
     endif()
 else()
     message(STATUS "Found existing OgmaNeo in ${OGMANEO_INCLUDE_DIRS}")
-    #message(STATUS "Found existing OgmaNeo lib ${OGMANEO_LIBRARIES}")
+    message(STATUS "Found existing OgmaNeo lib ${OGMANEO_LIBRARIES}")
 endif()
 
 include_directories(${OGMANEO_INCLUDE_DIRS})
@@ -160,15 +166,15 @@ include_directories(${JNI_INCLUDE_DIRS})
 # Setup SWIG bindings
 
 set(CMAKE_SWIG_OUTDIR "${CMAKE_BINARY_DIR}/src/main/java/com/ogmacorp/ogmaneo")
-set(CMAKE_SWIG_FLAGS -package com.ogmacorp.ogmaneo -outdir ${CMAKE_SWIG_OUTDIR})
+set(CMAKE_SWIG_FLAGS -package com.ogmacorp.ogmaneo -outdir ${CMAKE_SWIG_OUTDIR} -I\"${OGMANEO_INCLUDE_DIRS}\")
 
 set_source_files_properties(jogmaneo.i PROPERTIES CPLUSPLUS ON)
 
 swig_add_module(JOgmaNeo java jogmaneo.i)
 swig_link_libraries(JOgmaNeo ${JNI_LIBRARIES} ${OPENCL_LIBRARIES} ${OGMANEO_LIBRARIES})
 
-if ("${OGMANEO_INCLUDE_DIR}" STREQUAL "OGMANEO_INCLUDE_DIR-NOTFOUND" OR
-    "${OGMANEO_INCLUDE_DIR}" STREQUAL "")
+if ("${OGMANEO_INCLUDE_DIRS}" STREQUAL "OGMANEO_INCLUDE_DIRS-NOTFOUND" OR
+    "${OGMANEO_INCLUDE_DIRS}" STREQUAL "")
     add_dependencies(JOgmaNeo OgmaNeoDownload)
     set(SWIG_MODULE_JOgmaNeo_EXTRA_DEPS OgmaNeoDownload)
 endif()
