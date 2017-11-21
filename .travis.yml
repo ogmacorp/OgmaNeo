@@ -44,7 +44,7 @@ install:
   - bash ./.travis/install_swig.sh
 
   # Install dependancies for python
-  - pip install -r ./Python/requirements.txt
+  - pip install -r ./Python/requirements.txt --user
 
 script:
   - if [ $TRAVIS_OS_NAME == 'linux' ]; then
@@ -67,24 +67,31 @@ script:
 
   - $HOME/.local/cmake/bin/cmake -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=../install .. || travis_terminate 1;
 
-  - make
   - make install
 
   # Build the Python bindings
-  - cd ../Python
+  - cd $TRAVIS_BUILD_DIR/Python
+
+  # Update the config to find the locallly built OgmaNeo library
+  - echo "[build_ext]" > setup.cfg
+  - echo "inplace=0" >> setup.cfg
+  - echo "extra-cmake-args=-DOGMANEO_LIBRARIES=$(ls $TRAVIS_BUILD_DIR/install/lib/libOgmaNeo.*) -DOGMANEO_INCLUDE_DIR=$TRAVIS_BUILD_DIR/install/include/" >> setup.cfg
+  - cat setup.cfg
+
   - python setup.py bdist_wheel
 
   - cd dist/
   - ls -l
-  - pip install $(ls)
-  - cd ..
+  - pip install $(ls) --user
 
   - pip show ogmaneo
 
   # Build and test the Java JNI bindings
-  - cd ../Java
+  - cd $TRAVIS_BUILD_DIR/Java
   - mkdir build; cd build;
-  - $HOME/.local/cmake/bin/cmake ..
+
+  - $HOME/.local/cmake/bin/cmake -DOGMANEO_LIBRARIES=$(ls $TRAVIS_BUILD_DIR/install/lib/libOgmaNeo.*) -DOGMANEO_INCLUDE_DIR=$TRAVIS_BUILD_DIR/install/include/ ..
+
   - make
 
   - javac -cp JOgmaNeo.jar ../src/com/ogmacorp/Example.java -d .

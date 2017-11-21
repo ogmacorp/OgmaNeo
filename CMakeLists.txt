@@ -14,7 +14,7 @@ set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 set(OGMANEO_MAJOR_VERSION 1)
 set(OGMANEO_MINOR_VERSION 4)
-set(OGMANEO_PATCH_VERSION 1)
+set(OGMANEO_PATCH_VERSION 2)
 set(OGMANEO_VERSION
   ${OGMANEO_MAJOR_VERSION}.${OGMANEO_MINOR_VERSION}.${OGMANEO_PATCH_VERSION})
  
@@ -144,7 +144,7 @@ else()
     get_filename_component(CL2_HPP_DIR "${CL2_HPP_NAME}" DIRECTORY)
     message(STATUS "Found existing CL2.hpp in ${CL2_HPP_DIR}")
 
-    include_directories(SYSTEM "${CL2_HPP_DIR}/..")
+    include_directories("${CL2_HPP_DIR}/..")
 endif()
 
 
@@ -164,7 +164,9 @@ else()
         GIT_REPOSITORY "https://github.com/google/flatbuffers.git"
         CMAKE_ARGS
             "-DFLATBUFFERS_BUILD_TESTS=OFF"
+            "-DFLATBUFFERS_BUILD_FLATC=ON"
             "-DCMAKE_INSTALL_PREFIX=${3RDPARTY_PATH}"
+            "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
     )
     set(FLATBUFFERS_INCLUDE_DIRS "${3RDPARTY_PATH}/include")
     set(FLATBUFFERS_FLATC_EXECUTABLE "${3RDPARTY_PATH}/bin/flatc${CMAKE_EXECUTABLE_SUFFIX}")
@@ -248,7 +250,7 @@ file(GLOB_RECURSE LIBRARY_SRC
     "source/system/*.cpp"
 )
 
-include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/source")
+include_directories("${PROJECT_SOURCE_DIR}/source")
 
 # Build the main OgmaNeo library, as static or shared
 add_library(OgmaNeo ${LIBRARY_SRC})
