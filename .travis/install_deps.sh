@@ -15,8 +15,8 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     #brew unlink cmake
     brew update
 
-    brew tap homebrew/versions
-    brew install gcc@4.8
+    #brew tap homebrew/versions
+    #brew install gcc@4.9
 
 else
     sudo apt-get -qq update
