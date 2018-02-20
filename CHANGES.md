@@ -1,7 +1,13 @@
+1.4.2 November, 2017
+====================
+
+Fix for GCC 6+ system include handling
+Pass CMake build type to FlatBuffers building
+
 1.4.1 July, 2017
 ================
 
-- Correct a few README issues
+Correct a few README issues
 
 1.4 July, 2017
 ==============

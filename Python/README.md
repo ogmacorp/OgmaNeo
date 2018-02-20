@@ -126,7 +126,7 @@ Two options exist for OgmaNeo library developers that can redirect this process:
 Similar to the following, but with `<repo_dir>` changed to point to your OgmaNeo root directory, or to appropriate system wide locations. This assumes that the OgmaNeo CMAKE_INSTALL_PREFIX has been set to `<repo_dir>/install` and that a `make install` build step has been performed before running the `python setup.py install --user` command. Make sure to use `/` as a path seperator.  
 > [build_ext]  
 > inplace=0  
-> extra-cmake-args=-DOGMANEO_LIBRARY=\<repo_dir\>/install/lib/OgmaNeo.lib -DOGMANEO_INCLUDE_DIR=\<repo_dir\>/install/include  
+> extra-cmake-args=-DOGMANEO_LIBRARIES=\<repo_dir\>/install/lib/OgmaNeo.lib -DOGMANEO_INCLUDE_DIR=\<repo_dir\>/install/include  
 
 ## Contributions
 

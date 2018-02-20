@@ -25,7 +25,13 @@ endif()
 ############################################################################
 # Find OgmaNeo include and libs
 
-find_package(OgmaNeo HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../install/")
+if(WIN32 AND NOT CYGWIN)
+    set(DEF_INSTALL_CMAKE_DIR CMake)
+else()
+    set(DEF_INSTALL_CMAKE_DIR lib/CMake/OgmaNeo)
+endif()
+
+find_package(OgmaNeo CONFIG HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../install/${DEF_INSTALL_CMAKE_DIR}")
 
 if ("${OGMANEO_INCLUDE_DIR}" STREQUAL "OGMANEO_INCLUDE_DIR-NOTFOUND" OR
     "${OGMANEO_INCLUDE_DIR}" STREQUAL "")
