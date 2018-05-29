@@ -178,7 +178,7 @@ extension_mod = Extension(
 
 setup(
     name="ogmaneo",
-    version="1.4.2",
+    version="1.4.3",
     description="Python bindings for OgmaNeo library",
     long_description='https://github.com/ogmacorp/PyOgmaNeo',
     author='Ogma Intelligent Systems Corp',

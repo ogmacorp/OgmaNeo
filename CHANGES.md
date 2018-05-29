@@ -1,13 +1,18 @@
+1.4.3 May, 2018
+===============
+
+- Removal of the old Gym.py example (only worked with the swarming agent in v1.2, i.e. before the exponential memory and delay encoder changes in v1.3)
+
 1.4.2 November, 2017
 ====================
 
-Fix for GCC 6+ system include handling
-Pass CMake build type to FlatBuffers building
+- Fix for GCC 6+ system include handling
+- Pass CMake build type to FlatBuffers building
 
 1.4.1 July, 2017
 ================
 
-Correct a few README issues
+- Correct a few README issues
 
 1.4 July, 2017
 ==============
