@@ -16,7 +16,7 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     brew update
 
     #brew tap homebrew/versions
-    #brew install gcc@4.9
+    #brew install gcc@4.8
 
 else
     sudo apt-get -qq update
